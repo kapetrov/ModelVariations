@@ -313,7 +313,7 @@ void PedVariations::Process()
 {
     bool isRainy = CWeather__IsRainy();
     bool isSandstorm = CWeather::Sandstorm > 0.29;
-    bool isFoggy = CWeather::Foggyness > 0.4;
+    bool isFoggy = CWeather::Foggyness > 0.3;
     bool isWindy = CWeather::Wind > 0.29;
     bool isSunny = !isRainy && !isSandstorm && !isFoggy && !isWindy;
 

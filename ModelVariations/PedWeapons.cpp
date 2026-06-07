@@ -365,8 +365,15 @@ int16_t __fastcall CollectParametersHooked(void* _this, void*, unsigned __int16 
 template <std::uintptr_t address>
 bool __fastcall DoWeHaveWeaponAvailableHooked(CPed* ped, void*, eWeaponType weapId)
 {
-    auto slot = CWeaponInfo::GetWeaponInfo(weapId, 1)->m_nSlot;
-    if (ped->m_aWeapons[slot].m_eWeaponType > WEAPONTYPE_UNARMED)
+    if (!IsPedPointerValid(ped))
+        return false;
+
+    CWeaponInfo* wepInfo = CWeaponInfo::GetWeaponInfo(weapId, 1);
+    if (wepInfo == NULL)
+        return false;
+
+    auto slot = wepInfo->m_nSlot;
+    if (slot < 13 && ped->m_aWeapons[slot].m_eWeaponType > WEAPONTYPE_UNARMED)
         return true;
 
     return false;

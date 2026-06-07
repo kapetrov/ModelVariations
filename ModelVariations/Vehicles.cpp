@@ -2297,8 +2297,8 @@ void __declspec(naked) patch6A155C()
 
 isCement:
         mov ax, word ptr [edi + 0x22]
-        mov asmJmpAddress, 0x6A1564
-        jmp asmJmpAddress
+        push 0x6A1564
+        ret
     }
 }
 
@@ -2312,8 +2312,8 @@ void __declspec(naked) patch588570()
         call getVariationOriginalModel
         cmp ax, bx
         pop eax
-        mov asmJmpAddress, 0x588577
-        jmp asmJmpAddress
+        push 0x588577
+        ret
     }
 }
 
@@ -2336,8 +2336,8 @@ jmpOriginal:
         xor edi, edi
         push edi
         push 0xFFFFFFFF
-        mov asmJmpAddress, 0x6ABCC3
-        jmp asmJmpAddress
+        push 0x6ABCC3
+        ret
     }
 }
 
@@ -2347,8 +2347,8 @@ void __declspec(naked) patch6D42FE()
         push ecx
         call getVariationOriginalModel
         sub eax, 0x1A9
-        mov asmJmpAddress, 0x6D4304
-        jmp asmJmpAddress
+        push 0x6D4304
+        ret
     }
 }
 
@@ -2359,8 +2359,8 @@ void __declspec(naked) patch6AC730()
         mov eax, 0x403DA7
         mov eax, dword ptr [eax] //CModelInfo::ms_modelInfoPtrs
         mov eax, [eax + ecx*4]
-        mov asmJmpAddress, 0x6AC735
-        jmp asmJmpAddress
+        push 0x6AC735
+        ret
     }
 }
 
@@ -2370,8 +2370,8 @@ void __declspec(naked) patch6D474B()
         push edi
         call getVariationOriginalModel
         lea eax, [eax-0x1A9]
-        mov asmJmpAddress, 0x6D4751
-        jmp asmJmpAddress
+        push 0x6D4751
+        ret
     }
 }
 
@@ -2388,8 +2388,8 @@ void __declspec(naked) patch729B76()
         mov bx, word ptr [esi+0x22]
 isNotSWAT:
         popfd
-        mov asmJmpAddress, 0x729B7B
-        jmp asmJmpAddress
+        push 0x729B7B
+        ret
     }
 }
 
@@ -2399,6 +2399,7 @@ void __declspec(naked) patch6DD218()
         push ecx
         push edx
         push eax
+        mov edi, 0x1CC
         movsx eax, word ptr [esi+0x22]
         push eax
         call getVariationOriginalModel
@@ -2409,8 +2410,8 @@ isNotSkimmer:
         pop eax
         pop edx
         pop ecx
-        mov asmJmpAddress, 0x6DD21D
-        jmp asmJmpAddress
+        push 0x6DD21D
+        ret
     }
 }
 
@@ -2426,8 +2427,8 @@ void __declspec(naked) patch6AC0E2()
         mov edi, 0x220
 isFiretruckLS:
         pop eax
-        mov asmJmpAddress, 0x6AC0E7
-        jmp asmJmpAddress
+        push 0x6AC0E7
+        ret
     }
 }
 
@@ -2443,8 +2444,8 @@ void __declspec(naked) patch41F2A2()
         mov edi, 0x20B
 isCopBike:
         pop eax
-        mov asmJmpAddress, 0x41F2A7
-        jmp asmJmpAddress
+        push 0x41F2A7
+        ret
     }
 }
 
@@ -2459,8 +2460,8 @@ void __declspec(naked) patchCoronas()
         push esi
         push edi
         call RegisterCoronaHookedPointer
-        mov asmJmpAddress, 0x6ABA65
-        jmp asmJmpAddress
+        push 0x6ABA65
+        ret
     }
 }
 
@@ -3127,5 +3128,5 @@ void VehicleVariations::InstallHooks()
 
     DWORD oldProtect;
     if (VirtualProtect(asmNextInstr, 16, PAGE_EXECUTE_READWRITE, &oldProtect) == 0)
-        Log::Write("VirtualProtect failed: %s\n", GetLastError());
+        Log::Write("VirtualProtect failed: %u\n", GetLastError());
 }

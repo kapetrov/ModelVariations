@@ -645,7 +645,7 @@ void CPopCycle__DisplayHooked()
 
         bool isRainy = CWeather__IsRainy();
         bool isSandstorm = CWeather::Sandstorm > 0.29;
-        bool isFoggy = CWeather::Foggyness > 0.4;
+        bool isFoggy = CWeather::Foggyness > 0.3;
         bool isWindy = CWeather::Wind > 0.29;
 
         PrintDebugLine("Debug state: %d", drawDebugText);
@@ -719,7 +719,7 @@ void __cdecl RemoveTrianglePlanesHooked(CCollisionData* a2)
 
     if (!isAddressValid(link->prev) || !isAddressValid(link->next))
     {
-        Log::Write("RemoveTrianglePlanesHooked Error! link chain is invalid (prev:0x%X next:0x%X)\n", link);
+        Log::Write("RemoveTrianglePlanesHooked Error! link chain is invalid (prev:0x%X next:0x%X)\n", link->prev, link->next);
         a2->m_pTrianglePlanes = NULL;
         return;
     }
