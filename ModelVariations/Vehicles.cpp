@@ -2140,8 +2140,14 @@ void __fastcall DoVehicleLightsHooked(CAutomobile* _this, void*, void* m, int a3
 
     CPed* driverOriginal = _this->m_pDriver;
     float brakeOriginal = _this->m_fBreakPedal;
+    CVehicle* tractor = _this->m_pTractor;
 
-    if (IsVehiclePointerValid(_this->m_pTractor) && _this->m_pTractor->m_fBreakPedal > 0.0f)
+    while (tractor && IsVehiclePointerValid(tractor->m_pTractor))
+    {
+        tractor = tractor->m_pTractor;
+    }
+
+    if (IsVehiclePointerValid(tractor) && tractor->m_fBreakPedal > 0.0f)
     {
         _this->bEngineOn = true;
         if (_this->m_fBreakPedal < 0.1)
