@@ -51,6 +51,55 @@ enum eRegs32
     REG_EDI,
 };
 
+// The continuation thunks execute the instruction bytes overwritten by a hook,
+// then transfer control back to the game.  They are emitted as immutable code
+// at compile time instead of being rebuilt whenever the naked hook executes.
+#pragma section(".asm", execute, read)
+
+namespace
+{
+    template <uint8_t nextInstrSize, uint32_t nextInstr, uint32_t nextInstr2, std::uintptr_t jmpAddress>
+    struct AsmContinuation
+    {
+        static_assert(sizeof(std::uintptr_t) == sizeof(uint32_t),
+            "Vehicle ASM hooks require a 32-bit build");
+        static_assert(nextInstrSize <= sizeof(nextInstr) + sizeof(nextInstr2),
+            "At most eight overwritten instruction bytes can be replayed");
+
+        // push <absolute address>; ret is position-independent, so the entire
+        // thunk can be constant-initialized without calculating an E9 rel32 at run time.
+        using Code = std::array<uint8_t, nextInstrSize + 6>;
+
+        static constexpr Code MakeCode() noexcept
+        {
+            Code bytes{};
+
+            for (std::size_t i = 0; i < nextInstrSize; ++i)
+            {
+                const uint32_t source = i < sizeof(nextInstr) ? nextInstr : nextInstr2;
+                bytes[i] = static_cast<uint8_t>(source >> ((i % sizeof(nextInstr)) * 8));
+            }
+
+            bytes[nextInstrSize] = 0x68; // push imm32
+            bytes[nextInstrSize + 1] = static_cast<uint8_t>(jmpAddress);
+            bytes[nextInstrSize + 2] = static_cast<uint8_t>(jmpAddress >> 8);
+            bytes[nextInstrSize + 3] = static_cast<uint8_t>(jmpAddress >> 16);
+            bytes[nextInstrSize + 4] = static_cast<uint8_t>(jmpAddress >> 24);
+            bytes[nextInstrSize + 5] = 0xC3; // ret
+
+            return bytes;
+        }
+
+        static const Code code;
+    };
+
+    template <uint8_t nextInstrSize, uint32_t nextInstr, uint32_t nextInstr2, std::uintptr_t jmpAddress>
+    __declspec(allocate(".asm"))
+    constinit const typename AsmContinuation<nextInstrSize, nextInstr, nextInstr2, jmpAddress>::Code
+        AsmContinuation<nextInstrSize, nextInstr, nextInstr2, jmpAddress>::code =
+            AsmContinuation<nextInstrSize, nextInstr, nextInstr2, jmpAddress>::MakeCode();
+}
+
 static const char* dataFileName = "ModelVariations_Vehicles.ini";
 static DataReader dataFile(dataFileName);
 
@@ -69,11 +118,7 @@ std::map<CVehicle*, std::vector<CVehicle*>> spawnedTrailers;  //<veh, <trailers>
 std::uintptr_t x6ABCBE_Destination = 0;
 std::uintptr_t x4306A1_Destination = 0;
 
-uint32_t asmNextInstr[4] = {};
-uint16_t asmModel16 = 0;
-uint32_t asmModel32 = 0;
-std::uintptr_t asmJmpAddress = 0;
-uint32_t* jmpDest = asmNextInstr;
+static std::array<unsigned short, 65536> originalModels;
 
 struct tVehVars {
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
@@ -85,7 +130,6 @@ struct tVehVars {
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> trailerZones;
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> tuning;
     std::unordered_map<unsigned short, std::array<std::vector<unsigned short>, 6>> groupWantedVariations;
-    std::unordered_map<unsigned short, unsigned short> originalModels;
     std::unordered_map<unsigned short, std::vector<unsigned short>> drivers;
     std::unordered_map<unsigned short, std::vector<unsigned short>> passengers;
     std::unordered_map<unsigned short, std::vector<unsigned short>> driverGroups[9];
@@ -133,16 +177,25 @@ struct tVehOptions {
 std::unique_ptr<tVehOptions> vehOptions(new tVehOptions);
 
 
-static int __stdcall getVariationOriginalModel(const int modelIndex)
+static __declspec(naked) int __stdcall getVariationOriginalModel(int)
 {
-    if (modelIndex < 400)
-        return modelIndex;
+    __asm
+    {
+        push    ecx
 
-    auto it = vehVars->originalModels.find((unsigned short)modelIndex);
-    if (it != vehVars->originalModels.end())
-        return it->second;
+        mov     eax, [esp + 8] 
+        mov     ecx, eax
+        bswap   ecx
+        jcxz    in_range
 
-    return modelIndex;
+        pop     ecx
+        ret     4
+
+in_range:
+        movzx   eax, word ptr[originalModels + eax * 2]
+        pop     ecx
+        ret     4
+    }
 }
 
 float getDistanceFromVeh(CVehicle* vehicle, CEntity* target)
@@ -530,6 +583,8 @@ int getRandomVariation(const int modelid, bool parked = false)
 
 void VehicleVariations::ClearData()
 {
+    memset(&originalModels[0], 0, originalModels.size());
+
     vehVars.reset(new tVehVars());
     vehOptions.reset(new tVehOptions());
 
@@ -699,7 +754,7 @@ void VehicleVariations::LoadData()
                 if (auto it = i.second.find(modelid); it != i.second.end())
                     for (auto variation : it->second)
                         if (variation > 0 && variation != modelid && !(vectorHasId(vehOptions->inheritExclude, variation)))
-                            vehVars->originalModels.insert({ variation, modelid });
+                            originalModels[variation] = modelid;
 
 
             const int tuningChance = dataFile.ReadInteger(section, "TuningChance", -1);
@@ -831,7 +886,7 @@ void VehicleVariations::LoadData()
 
             vec = dataFile.ReadLine(section, "ParentModel", READ_VEHICLES);
             if (!vec.empty() && vec[0] >= 400)
-                vehVars->originalModels[modelid] = vec[0];
+                originalModels[modelid] = vec[0];
 
             vec = dataFile.ReadLine(section, "TrailersMatchExtras", READ_NUMS);
             if (!vec.empty())
@@ -853,6 +908,10 @@ void VehicleVariations::LoadData()
 
     std::sort(vehVars->parkedCars.begin(), vehVars->parkedCars.end());
     std::sort(vehVars->useOnlyGroups.begin(), vehVars->useOnlyGroups.end());
+
+    for (int i = 0; i < 65536; i++)
+        if (originalModels[i] == 0)
+            originalModels[i] = static_cast<unsigned short>(i);
 
     Log::Write("\n");
 }
@@ -2346,7 +2405,7 @@ void __declspec(naked) patch6D42FE()
     __asm {
         push ecx
         call getVariationOriginalModel
-        sub eax, 0x1A9
+        lea  eax, [eax - 0x1A9]
         push 0x6D4304
         ret
     }
@@ -2469,11 +2528,11 @@ template <eRegs32 reg, std::uintptr_t jmpAddress, unsigned int model>
 void __declspec(naked) cmpWordPtrRegModel()
 {
     __asm {
-        pushad
+        push eax
     }
 
-    asmModel32 = model;
-    asmJmpAddress = jmpAddress;
+    static unsigned int asmModel32 = model;
+    static std::uintptr_t asmJmpAddress = jmpAddress;
 
     if constexpr (reg == REG_EAX) { __asm { movsx eax, word ptr[eax + 0x22] } }
     else if constexpr (reg == REG_ECX) { __asm { movsx eax, word ptr[ecx + 0x22] } }
@@ -2488,7 +2547,7 @@ void __declspec(naked) cmpWordPtrRegModel()
         push eax
         call getVariationOriginalModel
         cmp eax, asmModel32
-        popad
+        pop eax
         jmp asmJmpAddress
     }
 }
@@ -2497,24 +2556,12 @@ template <eRegs16 reg, std::uintptr_t jmpAddress, unsigned int model, uint8_t ne
 void __declspec(naked) cmpReg16Model()
 {
     __asm {
-        pushad
+        push eax
     }
 
-    asmModel32 = model;
-    asmJmpAddress = jmpAddress;
-
-    if constexpr (nextInstrSize > 0)
-    {
-        asmNextInstr[0] = nextInstr;
-        asmNextInstr[1] = nextInstr2;
-        reinterpret_cast<uint8_t*>(asmNextInstr)[nextInstrSize] = 0xE9;
-        *(uint32_t*)((uint8_t*)asmNextInstr + nextInstrSize + 1) = jmpAddress - (uintptr_t)((uint8_t*)asmNextInstr + nextInstrSize + 5);
-
-        __asm {
-            popad
-            pushad
-        }
-    }
+    static constinit const uint8_t* const jmpDest = AsmContinuation<nextInstrSize, nextInstr, nextInstr2, jmpAddress>::code.data();
+    static unsigned int asmModel32 = model;
+    static std::uintptr_t asmJmpAddress = jmpAddress;
 
     if constexpr (reg == REG_AX) { __asm { movsx eax, ax } }
     else if constexpr (reg == REG_CX) { __asm { movsx eax, cx } }
@@ -2529,10 +2576,10 @@ void __declspec(naked) cmpReg16Model()
         push eax
         call getVariationOriginalModel
         cmp eax, asmModel32
-        popad
+        pop eax
     }
 
-    if constexpr (nextInstrSize > 0) { __asm {jmp jmpDest} }
+    if constexpr (nextInstrSize > 0) { __asm { jmp jmpDest } }
 
     __asm { jmp asmJmpAddress }
 }
@@ -2541,11 +2588,11 @@ template <eRegs32 reg, std::uintptr_t jmpAddress, unsigned int model>
 void __declspec(naked) cmpReg32Model()
 {
     __asm {
-        pushad
+        push eax
     }
 
-    asmModel32 = model;
-    asmJmpAddress = jmpAddress;
+    static unsigned int asmModel32 = model;
+    static std::uintptr_t asmJmpAddress = jmpAddress;
 
     if constexpr (reg == REG_EAX) { __asm { push eax } }
     else if constexpr (reg == REG_ECX) { __asm { push ecx } }
@@ -2559,7 +2606,7 @@ void __declspec(naked) cmpReg32Model()
     __asm {
         call getVariationOriginalModel
         cmp eax, asmModel32
-        popad
+        pop eax
         jmp asmJmpAddress
     }
 }
@@ -2569,18 +2616,11 @@ void __declspec(naked) movReg16WordPtrReg()
 {
     __asm {
         pushfd
-        pushad
+        push eax
     }
 
-    asmNextInstr[0] = nextInstr;
-    asmNextInstr[1] = nextInstr2;
-    reinterpret_cast<uint8_t*>(asmNextInstr)[nextInstrSize] = 0xE9;
-    *(uint32_t*)((uint8_t*)asmNextInstr + nextInstrSize + 1) = jmpAddress - (uintptr_t)((uint8_t*)asmNextInstr + nextInstrSize + 5);
-
-    __asm {
-        popad
-        pushad
-    }
+    static constinit const uint8_t* const jmpDest = AsmContinuation<nextInstrSize, nextInstr, nextInstr2, jmpAddress>::code.data();
+    static unsigned short asmModel16 = 0;
 
     if constexpr (source == REG_EAX) { __asm { movsx eax, word ptr[eax + 0x22]} }
     else if constexpr (source == REG_ECX) { __asm { movsx eax, word ptr[ecx + 0x22]} }
@@ -2595,7 +2635,7 @@ void __declspec(naked) movReg16WordPtrReg()
         push eax
         call getVariationOriginalModel
         mov asmModel16, ax
-        popad
+        pop eax
         popfd
     }
 
@@ -2618,18 +2658,11 @@ void __declspec(naked) movsxReg32WordPtrReg()
 {
     __asm {
         pushfd
-        pushad
+        push eax
     }
 
-    asmNextInstr[0] = nextInstr;
-    asmNextInstr[1] = nextInstr2;
-    reinterpret_cast<uint8_t*>(asmNextInstr)[nextInstrSize] = 0xE9;
-    *(uint32_t*)((uint8_t*)asmNextInstr + nextInstrSize + 1) = jmpAddress - (uintptr_t)((uint8_t*)asmNextInstr + nextInstrSize + 5);
-
-    __asm {
-        popad
-        pushad
-    }
+    static constinit const uint8_t* const jmpDest = AsmContinuation<nextInstrSize, nextInstr, nextInstr2, jmpAddress>::code.data();
+    static unsigned int asmModel32 = 0;
 
     if constexpr (source == REG_EAX) { __asm { movsx eax, word ptr[eax + 0x22]} }
     else if constexpr (source == REG_ECX) { __asm { movsx eax, word ptr[ecx + 0x22]} }
@@ -2644,7 +2677,7 @@ void __declspec(naked) movsxReg32WordPtrReg()
         push eax
         call getVariationOriginalModel
         mov asmModel32, eax
-        popad
+        pop eax
         popfd
     }
 
@@ -2979,7 +3012,7 @@ void VehicleVariations::InstallHooks()
         hookASM(0x6E1C17, "66 81 7E 22 DD 01",                cmpWordPtrRegModel<REG_ESI, 0x6E1C1D, 0x1DD>, "CVehicle::DoVehicleLights");
         hookASM(0x6C4F66, "66 8B 46 22 66 3D BF 01",          movReg16WordPtrReg<REG_AX, REG_ESI, 0x6C4F6E, 4, 0x01BF3D66>, "CHeli::ProcessFlyingCarStuff");
         hookASM(0x6C5605, "66 8B 4E 22 66 81 F9 D5 01",       movReg16WordPtrReg<REG_CX, REG_ESI, 0x6C560E, 5, 0xD5F98166, 0x90909001>, "CHeli::PreRender");
-        hookASM(0x7408E3, "66 8B 47 22 66 3D BF 01",          movReg16WordPtrReg<REG_AX, REG_EDI, 0x7408EB, 4, 0x01D53D66>, "CWeapon::FireInstantHit");
+        hookASM(0x7408E3, "66 8B 47 22 66 3D BF 01",          movReg16WordPtrReg<REG_AX, REG_EDI, 0x7408EB, 4, 0x01BF3D66>, "CWeapon::FireInstantHit");
         hookASM(0x6A8DE2, "66 8B 46 22 66 3D BF 01",          movReg16WordPtrReg<REG_AX, REG_ESI, 0x6A8DEA, 4, 0x01BF3D66>, "CAutomobile::ProcessBuoyancy");
         hookASM(0x6F367E, "81 FD BF 01 00 00",                cmpReg32Model<REG_EBP, 0x6F3684, 0x1BF>, "CCarGenerator::DoInternalProcessing");
         hookASM(0x51D864, "66 81 7A 22 CC 01",                cmpWordPtrRegModel<REG_EDX, 0x51D86A, 0x1CC>, "CCamera::IsItTimeForNewcam");
@@ -3084,7 +3117,7 @@ void VehicleVariations::InstallHooks()
         hookASM(0x6B1E59, "66 81 F9 1B 02",                   cmpReg16Model<REG_CX, 0x6B1E5E, 0x21B>, "CAutomobile::ProcessControl");
         hookASM(0x6B284B, "66 81 7E 22 1B 02",                cmpWordPtrRegModel<REG_ESI, 0x6B2851, 0x21B>, "CAutomobile::ProcessControl");
         hookASM(0x6B356A, "66 81 7E 22 1B 02",                cmpWordPtrRegModel<REG_ESI, 0x6B3570, 0x21B>, "CAutomobile::ProcessControl");
-        hookASM(0x6B44AA, "66 8B 43 22 66 3D 0D 02",          movReg16WordPtrReg<REG_AX, REG_EBX, 0x6B44B2, 4, 0x22438B66>, "CAutomobile::SetTowLink");
+        hookASM(0x6B44AA, "66 8B 43 22 66 3D 0D 02",          movReg16WordPtrReg<REG_AX, REG_EBX, 0x6B44B2, 4, 0x020D3D66>, "CAutomobile::SetTowLink");
         hookASM(0x6CEED5, "66 81 78 22 0D 02",                cmpWordPtrRegModel<REG_EAX, 0x6CEEDB, 0x20D>, "CTrailer::GetTowHitchPos");
         hookASM(0x6DFDB2, "66 8B 43 22 66 3D 0D 02",          movReg16WordPtrReg<REG_AX, REG_EBX, 0x6DFDBA, 4, 0x020D3D66>, "CVehicle::UpdateTrailerLink");
         hookASM(0x6E00D0, "66 8B 46 22 66 3D 0D 02",          movReg16WordPtrReg<REG_AX, REG_ESI, 0x6E00D8, 4, 0x020D3D66>, "CVehicle::UpdateTractorLink");
@@ -3125,8 +3158,4 @@ void VehicleVariations::InstallHooks()
 
         hookCall(0x8719A8, ProcessControlInputsHooked<0x8719A8>, "CPlane::ProcessControlInputs", true);
     }
-
-    DWORD oldProtect;
-    if (VirtualProtect(asmNextInstr, 16, PAGE_EXECUTE_READWRITE, &oldProtect) == 0)
-        Log::Write("VirtualProtect failed: %u\n", GetLastError());
 }
