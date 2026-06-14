@@ -162,7 +162,7 @@ void PedVariations::LoadData()
         std::string section = iniData.first;
 
         if (!section.empty() && section[0] >= '0' && section[0] <= '9')
-            i = fast_atoi(iniData.first.c_str());
+            fromString<int>(iniData.first, i);
         else
             CModelInfo::GetModelInfo(section.data(), &i);
 

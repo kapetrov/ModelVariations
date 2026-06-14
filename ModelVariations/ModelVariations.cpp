@@ -149,8 +149,9 @@ void checkForUpdate()
 
             for (size_t i = 0; i < newV.size(); i++)
             {
-                int n1 = fast_atoi(newV[i].c_str());
-                int n2 = fast_atoi(oldV[i].c_str());
+                int n1 = INT_MAX, n2 = INT_MAX;
+                fromString<int>(newV[i], n1);
+                fromString<int>(oldV[i], n2);
 
                 if (n1 == INT_MAX || n2 == INT_MAX) 
                     return;
@@ -458,7 +459,7 @@ void initialize()
 
     uint32_t* streamingMemoryOriginal = (uint32_t*)0x5B8E6A;
     uint32_t streamingMemoryNew = 0;
-    uIntFromString(iniSettings.ReadString("Limits", "StreamingMemory", ""), streamingMemoryNew);
+    fromString<uint32_t>(iniSettings.ReadString("Limits", "StreamingMemory", ""), streamingMemoryNew);
     streamingMemoryNew = streamingMemoryNew * 1024 * 1024;
     if (streamingMemoryNew > 52428800)
     {

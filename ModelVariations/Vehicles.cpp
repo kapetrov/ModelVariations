@@ -583,7 +583,7 @@ int getRandomVariation(const int modelid, bool parked = false)
 
 void VehicleVariations::ClearData()
 {
-    memset(&originalModels[0], 0, originalModels.size());
+	originalModels.fill(0);
 
     vehVars.reset(new tVehVars());
     vehOptions.reset(new tVehOptions());
@@ -615,7 +615,7 @@ void VehicleVariations::LoadData()
         std::string section = iniData.first;
         int iModel = 0;
         if (section[0] >= '0' && section[0] <= '9')
-            iModel = fast_atoi(section.c_str());
+             fromString<int>(section, iModel);
         else
         {
             CModelInfo::GetModelInfo(section.data(), &iModel);
@@ -1775,9 +1775,9 @@ CPed* __cdecl AddPedHooked(unsigned int pedType, int modelIndex, CVector* posn, 
     {
         Log::Write("Error! Ped model %d is not loaded. Loading now... ", model);
         if (loadModel(model, PRIORITY_REQUEST, true) == LOADSTATE_LOADED)
-            Log::Write("OK\n", model);
+            Log::Write("OK\n");
         else
-            Log::Write("FAILED\n", model);
+            Log::Write("FAILED\n");
     }
 
     return callOriginalAndReturn<CPed*, address>(pedType, modelIndex, posn, unknown);
@@ -1972,9 +1972,12 @@ template <std::uintptr_t address>
 void __fastcall AddAudioEventHooked(CAEVehicleAudioEntity* audio, void*, int audioEvent, float fVolume)
 {
     //https://github.com/JuniorDjjr/TruckTrailer
-    CVehicle* vehicle = static_cast<CVehicle*>(audio->m_pEntity);
-    if ((CTimer::m_snTimeInMilliseconds - vehicle->m_nCreationTime) > 2000)
-        callMethodOriginal<address>(audio, audioEvent, fVolume);
+    if (audio)
+    {
+        CVehicle* vehicle = static_cast<CVehicle*>(audio->m_pEntity);
+        if (vehicle && (CTimer::m_snTimeInMilliseconds - vehicle->m_nCreationTime) > 2000)
+            callMethodOriginal<address>(audio, audioEvent, fVolume);
+    }
 }
 
 template <std::uintptr_t address>

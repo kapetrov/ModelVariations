@@ -86,7 +86,7 @@ void PedWeaponVariations::LoadData()
         }
         else
         {
-            modelid = fast_atoi(section.c_str());
+            fromString<int>(section, modelid);
             if (modelid > 0 && modelid < 65535)
                 pedHasWeaponVariations.push_back((unsigned short)modelid);
         }

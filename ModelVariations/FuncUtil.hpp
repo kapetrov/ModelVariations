@@ -291,53 +291,24 @@ inline std::string trimString(const std::string& str)
     return str.substr(first, (last - first + 1));
 }
 
-//https://stackoverflow.com/questions/16826422/c-most-efficient-way-to-convert-string-to-int-faster-than-atoi
-inline int fast_atoi(const char* str, bool returnAtInvalidChar = false)
+template <typename T>
+inline bool fromString(std::string_view str, T& x, int base = 10)
 {
-    int val = 0;
-    bool negative = (*str == '-') ? true : false;
-    if (negative)
-        str++;
-
-    while (*str)
-    {
-        if (*str < '0' || *str > '9')
-        {
-            if (returnAtInvalidChar)
-                return negative ? -val : val;
-            return INT_MAX;
-        }
-        val = val * 10 + (*str++ - '0');
-    }
-    return negative ? -val : val;
-}
-
-inline bool floatFromString(const std::string& str, float& x)
-{
-    float value{};
+    T value{};
 
     const char* first = str.data();
     const char* last = str.data() + str.size();
 
-    auto [ptr, ec] = std::from_chars(first, last, value, std::chars_format::general);
+    std::from_chars_result result{};
 
-    if (ec != std::errc{} || ptr != last)
-        return false;
+    if constexpr (std::is_integral_v<T>)
+        result = std::from_chars(first, last, value, base);
+    else if constexpr (std::is_floating_point_v<T>)
+        result = std::from_chars(first, last, value);
+    else
+        static_assert(std::is_arithmetic_v<T>, "fromString<T> only supports arithmetic types parseable by std::from_chars");
 
-    x = value;
-    return true;
-}
-
-inline bool uIntFromString(const std::string& str, unsigned int& x)
-{
-    unsigned int value{};
-
-    const char* first = str.data();
-    const char* last = str.data() + str.size();
-
-    auto [ptr, ec] = std::from_chars(first, last, value, 10);
-
-    if (ec != std::errc{} || ptr != last)
+    if (result.ec != std::errc{} || result.ptr != last)
         return false;
 
     x = value;

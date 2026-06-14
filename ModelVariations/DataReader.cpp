@@ -65,22 +65,19 @@ int DataReader::ReadInteger(const std::string &section, const std::string &key, 
 	int value = defaultValue;
 	if (auto itSection = data.find(section); itSection != data.end())
 		if (auto itKey = itSection->second.find(key); itKey != itSection->second.end())
-			value = fast_atoi(itKey->second.c_str());
+			fromString<int>(itKey->second, value);
 	
-	return (value == INT_MAX) ? defaultValue : value;
+	return value;
 }
 
 float DataReader::ReadFloat(const std::string& section, const std::string& key, float defaultValue)
 {
+	float value = defaultValue;
 	if (auto itSection = data.find(section); itSection != data.end())
 		if (auto itKey = itSection->second.find(key); itKey != itSection->second.end())
-		{
-			float value;
-			if (floatFromString(itKey->second.c_str(), value))
-				return value;
-		}
+			fromString<float>(itKey->second, value);
 
-	return defaultValue;
+	return value;
 }
 
 bool DataReader::ReadBoolean(const std::string &section, const std::string &key, bool defaultValue)
@@ -125,9 +122,10 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		size_t start = trimmed.find('{');
 		size_t end = trimmed.find('}', start);
 
-		if (start != std::string::npos && end > start) {
-			int n = fast_atoi(trimmed.substr(start + 1, end - start - 1).c_str());
-			if (n > 0 && n < 10000)
+		if (start != std::string::npos && end > start) 
+		{
+			int n = 0;
+			if (fromString<int>(trimmed.substr(start + 1, end - start - 1), n) && n > 0 && n < 10000)
 				multiplier = n;
 		}
 
@@ -138,8 +136,8 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 
 		if (parseType == READ_NUMS)
 		{
-			auto num = fast_atoi(token);
-			if (num > -1 && num < INT_MAX)
+			int num = -1;
+			if (fromString<int>(token, num) && num > -1 && num < 65536)
 				for (int i = 0; i < multiplier; i++)
 					retVector.push_back((unsigned short)num);
 		}
@@ -147,7 +145,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		{
 			int weaponType = -1;
 			if (token[0] >= '0' && token[0] <= '9')
-				weaponType = fast_atoi(token);
+				fromString<int>(token, weaponType);
 
 			if (weaponType > -1 && weaponType < 1000 && CWeaponInfo::GetWeaponInfo((eWeaponType)weaponType, 1) != NULL)
 				for (int i = 0; i < multiplier; i++)
@@ -157,8 +155,8 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		{
 			if (strncmp(token, "OccupantGroup", 13) == 0)
 			{
-				auto occupantGroup = fast_atoi(token + 13);
-				if (occupantGroup > 0 && occupantGroup < INT_MAX)
+				int occupantGroup = 0;
+				if (fromString<int>(token + 13, occupantGroup) && occupantGroup > 0 && occupantGroup < 256)
 					for (int i = 0; i < multiplier; i++)
 						retVector.push_back((unsigned short)occupantGroup);
 			}
@@ -167,8 +165,8 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		{
 			if (_strnicmp(token, "paintjob", 8) == 0)
 			{
-				auto paintjob = fast_atoi(token + 8);
-				if (paintjob > 0 && paintjob <= 10)
+				int paintjob = 0;
+				if (fromString<int>(token + 8, paintjob) && paintjob > 0)
 					for (int i = 0; i < multiplier; i++)
 						retVector.push_back((unsigned short)paintjob-1U);
 			}
@@ -186,8 +184,8 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		}
 		else if (parseType == READ_TRAILERS && strncmp(token, "Trailers", 8) == 0)
 		{
-			auto trailer = fast_atoi(token + 8);
-			if (trailer > 0 && trailer < 10)
+			int trailer = 0; ;
+			if (fromString<int>(token + 8, trailer) && trailer > 0)
 				for (int i = 0; i < multiplier; i++)
 					retVector.push_back((unsigned short)trailer);
 		}
@@ -196,8 +194,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 			CBaseModelInfo* mInfo = NULL;
 			if (token[0] >= '0' && token[0] <= '9')
 			{
-				modelid = fast_atoi(token);
-				if (modelid < 0 || modelid > 65535)
+				if (fromString<int>(token, modelid) && modelid < 0 || modelid > 65535)
 				{
 					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), token);
 					return {};
@@ -234,7 +231,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 				else if (CStreaming__ms_pExtraObjectsDir->FindItem(token) && isAddressValid(mInfo7))
 				{
 					static unsigned short startID = 1326;
-					for (unsigned short i = startID; i < maxPedID; i++)
+					for (unsigned short i = startID; i < std::min(maxPedID, 65535); i++)
 						if (CModelInfo::GetModelInfo(i) == NULL)
 						{
 							startID = i;
@@ -287,8 +284,7 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::
 			CBaseModelInfo* mInfo = NULL;
 			if (token[0] >= '0' && token[0] <= '9')
 			{
-				modelid = fast_atoi(token.c_str());
-				if (modelid < 0 || modelid > 65535)
+				if (fromString<int>(token, modelid) && modelid < 0 || modelid > 65535)
 				{
 					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), token.c_str());
 					return {};
@@ -320,8 +316,7 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::
 				CBaseModelInfo* mInfo = NULL;
 				if (s[0] >= '0' && s[0] <= '9')
 				{
-					modelid = fast_atoi(s.c_str());
-					if (modelid < 0 || modelid > 65535)
+					if (fromString<int>(s, modelid) && modelid < 0 || modelid > 65535)
 					{
 						Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), s.c_str());
 						return {};
