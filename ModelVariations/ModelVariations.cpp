@@ -678,10 +678,24 @@ int __cdecl FileLoaderLoadObject(const char* a1)
 {
     if (a1)
     {
-        int modelId = -1;
-        char modelName[50] = {};
-        if (sscanf(a1, "%d %49s", &modelId, modelName) == 2 && modelId > 0 && strnlen(modelName, 49) > 0)
-            modelNames[(unsigned short)modelId] = modelName;
+        int id = -1;
+        const char* p = std::strchr(a1, ' ');
+
+        if (p)
+        {
+            auto r = std::from_chars(a1, p, id);
+
+            if (r.ec == std::errc{} && r.ptr == p && id > 0 && id < 65536)
+            {
+                while (*p == ' ') ++p;
+
+                const char* n = p;
+                while (*p && *p != ' ') ++p;
+
+                if (p != n)
+                    modelNames[static_cast<unsigned short>(id)] = std::string(n, p);
+            }
+        }
     }
 
     return callOriginalAndReturn<unsigned int, address>(a1);

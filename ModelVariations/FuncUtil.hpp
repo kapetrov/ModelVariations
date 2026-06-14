@@ -292,7 +292,7 @@ inline std::string trimString(const std::string& str)
 }
 
 template <typename T>
-inline bool fromString(std::string_view str, T& x, int base = 10)
+bool fromString(std::string_view str, T& x, int base = 10)
 {
     T value{};
 
