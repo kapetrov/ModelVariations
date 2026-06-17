@@ -108,7 +108,6 @@ unsigned short roadblockDriver = 0;
 unsigned short lightsModel = 0;
 int currentOccupantsGroup = -1;
 unsigned short currentOccupantsModel = 0;
-bool policeOccupants = false;
 bool tuneParkedCar = false;
 
 int occupantModelIndex = -1;
@@ -1394,7 +1393,6 @@ void __cdecl AddPoliceCarOccupantsHooked(CVehicle* a2, char a3)
         return;
 
     processOccupantGroups(a2);
-    policeOccupants = true;
 
     const unsigned short model = a2->m_nModelIndex;
     a2->m_nModelIndex = (unsigned short)getVariationOriginalModel(a2->m_nModelIndex);
@@ -1403,7 +1401,6 @@ void __cdecl AddPoliceCarOccupantsHooked(CVehicle* a2, char a3)
 
     a2->m_nModelIndex = model;
 
-    policeOccupants = false;
     currentOccupantsGroup = -1;
     currentOccupantsModel = 0;
 }
@@ -1751,7 +1748,7 @@ CPed* __cdecl AddPedHooked(unsigned int pedType, int modelIndex, CVector* posn, 
         if (auto loadState = loadModel(occupantModelIndex, PRIORITY_REQUEST, true); loadState == LOADSTATE_LOADED)
         {
             modelIndex = occupantModelIndex;
-            if (pedType != PED_TYPE_MEDIC)
+            if (pedType != PED_TYPE_MEDIC && pedType != PED_TYPE_COP)
             {
                 CPedModelInfo* mInfo = (CPedModelInfo*)CModelInfo::GetModelInfo(occupantModelIndex);
                 if (mInfo)
