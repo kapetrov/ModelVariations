@@ -55,7 +55,7 @@ struct tPedVars {
     std::vector<unsigned short> mergeInteriors;
 };
 
-std::unique_ptr<tPedVars> pedVars(new tPedVars);
+static tPedVars pedVars;
 
 
 struct tPedOptions {
@@ -63,7 +63,7 @@ struct tPedOptions {
     bool improveCivilianVariety = false;
 };
 
-std::unique_ptr<tPedOptions> pedOptions(new tPedOptions);
+static tPedOptions pedOptions;
 
 unsigned short variationModel = 0;
 
@@ -90,8 +90,8 @@ bool isValidPedId(int id)
 
 unsigned short PedVariations::GetVariationOriginalModel(const int modelIndex)
 {
-    auto it = pedVars->originalModels.find((unsigned short)modelIndex);
-    if (it != pedVars->originalModels.end())
+    auto it = pedVars.originalModels.find((unsigned short)modelIndex);
+    if (it != pedVars.originalModels.end())
         return it->second;
 
     return { (unsigned short)modelIndex };
@@ -142,8 +142,8 @@ bool canPedDriveVeh(int pedModel, int vehModel)
 
 void PedVariations::ClearData()
 {
-    pedVars.reset(new tPedVars());
-    pedOptions.reset(new tPedOptions());
+    pedVars = {};
+    pedOptions = {};
 
     dataFile.data.clear();
 }
@@ -179,20 +179,20 @@ void PedVariations::LoadData()
 
                     if (!vec.empty())
                     {
-                        pedVars->pedHasVariations.insert(modelIndex);
+                        pedVars.pedHasVariations.insert(modelIndex);
                         if (it->second.empty()) //Global
                         {
                             for (int k = 0; k < CTheZones::TotalNumberOfInfoZones; k++)
                             {
                                 CZone* zone = reinterpret_cast<CZone*>(CTheZones__NavigationZoneArray + k * 0x20);
                                 uint64_t zoneName = *reinterpret_cast<uint64_t*>(zone->m_szLabel);
-                                pedVars->variations[zoneName][modelIndex] = vectorUnion(pedVars->variations[zoneName][modelIndex], vec);
+                                pedVars.variations[zoneName][modelIndex] = vectorUnion(pedVars.variations[zoneName][modelIndex], vec);
                             }
                         }
                         else for (auto zone : it->second)
                         {
                             uint64_t zoneName = *reinterpret_cast<uint64_t*>(zone->m_szLabel);
-                            pedVars->variations[zoneName][modelIndex] = vectorUnion(pedVars->variations[zoneName][modelIndex], vec);
+                            pedVars.variations[zoneName][modelIndex] = vectorUnion(pedVars.variations[zoneName][modelIndex], vec);
                         }
                     }
                 }
@@ -206,10 +206,10 @@ void PedVariations::LoadData()
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_PEDS);
                     if (!vec.empty())
                     {
-                        pedVars->pedHasVariations.insert(modelIndex);
+                        pedVars.pedHasVariations.insert(modelIndex);
                         uint64_t zoneName = 0;
                         strncpy((char*)&zoneName, kvp.first.c_str(), 8);
-                        pedVars->variations[zoneName][modelIndex] = mergeZones ? vectorUnion(pedVars->variations[zoneName][modelIndex], vec) : vec;
+                        pedVars.variations[zoneName][modelIndex] = mergeZones ? vectorUnion(pedVars.variations[zoneName][modelIndex], vec) : vec;
                     }
                 }
             }
@@ -219,14 +219,14 @@ void PedVariations::LoadData()
                 auto vec = dataFile.ReadLine(section, "Wanted" + std::to_string(j+1), READ_PEDS);
                 if (vec.empty())
                     continue;
-                pedVars->wantedVariations[modelIndex][j] = vec;
+                pedVars.wantedVariations[modelIndex][j] = vec;
             }
 
-            for (const auto& j : pedVars->variations)
+            for (const auto& j : pedVars.variations)
                 if (auto it = j.second.find(modelIndex); it != j.second.end())
                     for (auto variation : it->second)
                         if (variation > 0 && variation != modelIndex)
-                            pedVars->originalModels.insert({ variation, modelIndex });
+                            pedVars.originalModels.insert({ variation, modelIndex });
 
             for (unsigned int j = 0; j < 9; j++)
             {
@@ -240,7 +240,7 @@ void PedVariations::LoadData()
 
                         if (!vec.empty())
                         {
-                            pedVars->timeGroups[modelIndex].push_back(pedTimeGroup((unsigned short)groupStart, (unsigned short)groupEnd, vec));
+                            pedVars.timeGroups[modelIndex].push_back(pedTimeGroup((unsigned short)groupStart, (unsigned short)groupEnd, vec));
                             continue;
                         }
                     }
@@ -249,38 +249,38 @@ void PedVariations::LoadData()
             }
 
             if (dataFile.ReadBoolean(section, "DontInheritBehaviour", false))
-                pedVars->dontInheritBehaviourModels.push_back(modelIndex);
+                pedVars.dontInheritBehaviourModels.push_back(modelIndex);
 
             if (dataFile.ReadBoolean(section, "MergeInteriorsWithAreasAndZones", false))
-                pedVars->mergeInteriors.push_back(modelIndex);
+                pedVars.mergeInteriors.push_back(modelIndex);
 
             if (dataFile.ReadBoolean(section, "DisableOnMission", false))
-                pedVars->disableOnMission.push_back(modelIndex);
+                pedVars.disableOnMission.push_back(modelIndex);
         }
         
         auto vec = dataFile.ReadLine(section, "WeatherSunny", READ_PEDS);
         if (!vec.empty())
-            pedVars->weatherSunny[modelIndex] = vec;
+            pedVars.weatherSunny[modelIndex] = vec;
 
         vec = dataFile.ReadLine(section, "WeatherRainy", READ_PEDS);
         if (!vec.empty())
-            pedVars->weatherRainy[modelIndex] = vec;
+            pedVars.weatherRainy[modelIndex] = vec;
 
         vec = dataFile.ReadLine(section, "WeatherFoggy", READ_PEDS);
         if (!vec.empty())
-            pedVars->weatherFoggy[modelIndex] = vec;
+            pedVars.weatherFoggy[modelIndex] = vec;
 
         vec = dataFile.ReadLine(section, "WeatherSandstorm", READ_PEDS);
         if (!vec.empty())
-            pedVars->weatherSandstorm[modelIndex] = vec;
+            pedVars.weatherSandstorm[modelIndex] = vec;
 
         vec = dataFile.ReadLine(section, "WeatherWindy", READ_PEDS);
         if (!vec.empty())
-            pedVars->weatherWindy[modelIndex] = vec;
+            pedVars.weatherWindy[modelIndex] = vec;
 
         int parentVoice = dataFile.ReadInteger(section, "UseParentVoice", -1);
         if (parentVoice > -1)
-            pedVars->useParentVoice[modelIndex] = static_cast<bool>(parentVoice);
+            pedVars.useParentVoice[modelIndex] = static_cast<bool>(parentVoice);
 
         std::string animGroupString = dataFile.ReadString(section, "AnimGroup", "");
         if (!animGroupString.empty() && CAnimManager__ms_numAnimAssocDefinitions > 0)
@@ -289,22 +289,22 @@ void PedVariations::LoadData()
                 const char* animString = CAnimManager__GetAnimGroupName(j);
                 if (animString != NULL && strcmp(animGroupString.c_str(), animString) == 0)
                 {
-                    pedVars->animGroups[modelIndex] = (unsigned)j;
+                    pedVars.animGroups[modelIndex] = (unsigned)j;
                     break;
                 }
             }
 
         vec = dataFile.ReadLine(section, "Voice", READ_PEDS);
         if (!vec.empty())
-            pedVars->voices.insert({ modelIndex, vec });
+            pedVars.voices.insert({ modelIndex, vec });
     }
 
-    std::sort(pedVars->dontInheritBehaviourModels.begin(), pedVars->dontInheritBehaviourModels.end());
-    std::sort(pedVars->mergeInteriors.begin(), pedVars->mergeInteriors.end());
-    std::sort(pedVars->disableOnMission.begin(), pedVars->disableOnMission.end());
+    std::sort(pedVars.dontInheritBehaviourModels.begin(), pedVars.dontInheritBehaviourModels.end());
+    std::sort(pedVars.mergeInteriors.begin(), pedVars.mergeInteriors.end());
+    std::sort(pedVars.disableOnMission.begin(), pedVars.disableOnMission.end());
 
-    pedOptions->useParentVoices = dataFile.ReadBoolean("Settings", "UseParentVoices", false);
-    pedOptions->improveCivilianVariety = dataFile.ReadBoolean("Settings", "ImproveCivilianVariety", false);
+    pedOptions.useParentVoices = dataFile.ReadBoolean("Settings", "UseParentVoices", false);
+    pedOptions.improveCivilianVariety = dataFile.ReadBoolean("Settings", "ImproveCivilianVariety", false);
 
     Log::Write("\n");
 }
@@ -329,12 +329,12 @@ void PedVariations::Process()
 
     int gameTime = (CClock::ms_nGameClockHours * 100 + CClock::ms_nGameClockMinutes);
 
-    for (auto& it : pedVars->activeTimeGroups)
+    for (auto& it : pedVars.activeTimeGroups)
         for (auto it2 = it.second.begin(); it2 !=it.second.end();)
         {
             unsigned short index = *it2;
 
-            if (!isTimeInRange(gameTime, pedVars->timeGroups[it.first][index].start, pedVars->timeGroups[it.first][index].end))
+            if (!isTimeInRange(gameTime, pedVars.timeGroups[it.first][index].start, pedVars.timeGroups[it.first][index].end))
             {
                 it2 = it.second.erase(it2);
                 variationsUpdateQueued = it.first;
@@ -345,11 +345,11 @@ void PedVariations::Process()
             }
         }
 
-    for (const auto& it : pedVars->timeGroups)
+    for (const auto& it : pedVars.timeGroups)
         for (unsigned int i = 0; i < it.second.size(); i++)
         {
             if (isTimeInRange(gameTime, it.second[i].start, it.second[i].end))
-                if (pedVars->activeTimeGroups[it.first].insert((unsigned short)i).second == true)
+                if (pedVars.activeTimeGroups[it.first].insert((unsigned short)i).second == true)
                     variationsUpdateQueued = it.first;
         }
 
@@ -373,7 +373,7 @@ void PedVariations::Process()
         PedVariations::LogCurrentVariations();
         Log::Write("\n");
         Log::Write("Active time groups\n");
-        for (auto it : pedVars->activeTimeGroups)
+        for (auto it : pedVars.activeTimeGroups)
         {
             if (!it.second.empty())
             {
@@ -393,15 +393,15 @@ void PedVariations::Process()
 
     ProcessDrugDealers();
 
-    while (!pedVars->stack.empty())
+    while (!pedVars.stack.empty())
     {
-        CPed* ped = pedVars->stack.top();
-        pedVars->stack.pop();
+        CPed* ped = pedVars.stack.top();
+        pedVars.stack.pop();
 
         if (IsPedPointerValid(ped) && isValidPedId(ped->m_nModelIndex))
         {
-            auto it = pedVars->currentVariations.find(ped->m_nModelIndex);
-            if (it != pedVars->currentVariations.end() && !it->second.empty() && it->second[0] == 0 && ped->m_nCreatedBy != 2) //Delete models with a 0 id variation
+            auto it = pedVars.currentVariations.find(ped->m_nModelIndex);
+            if (it != pedVars.currentVariations.end() && !it->second.empty() && it->second[0] == 0 && ped->m_nCreatedBy != 2) //Delete models with a 0 id variation
             {
                 CVehicle* veh = ped->m_pVehicle;
                 if (IsVehiclePointerValid(veh) && veh->m_nCreatedBy != eVehicleCreatedBy::MISSION_VEHICLE && veh->m_pDriver == ped)
@@ -430,7 +430,7 @@ void PedVariations::ProcessDrugDealers(bool reset)
         {
             Log::Write("Applying drug dealer fix...\n");
          
-            for (auto& it : pedVars->originalModels)
+            for (auto& it : pedVars.originalModels)
                 if (it.first > 300)
                     if (it.second == 28 || it.second == 29 || it.second == 30 || it.second == 254)
                     {
@@ -449,77 +449,77 @@ void PedVariations::ProcessDrugDealers(bool reset)
 void PedVariations::UpdateVariations()
 {
     const CWanted* wanted = FindPlayerWanted(-1);
-    pedVars->currentVariations.clear();
+    pedVars.currentVariations.clear();
 
     auto player = FindPlayerPed();
-    auto interiorVariations = (player->m_pEnex) ? pedVars->variations.find(*reinterpret_cast<const uint64_t*>(player->m_pEnex)) : pedVars->variations.end();
-    auto zoneVariations = pedVars->variations.find(*reinterpret_cast<uint64_t*>(currentZone));
+    auto interiorVariations = (player->m_pEnex) ? pedVars.variations.find(*reinterpret_cast<const uint64_t*>(player->m_pEnex)) : pedVars.variations.end();
+    auto zoneVariations = pedVars.variations.find(*reinterpret_cast<uint64_t*>(currentZone));
     
-    for (auto& modelid : pedVars->pedHasVariations)
+    for (auto& modelid : pedVars.pedHasVariations)
     {
         bool modelHasInteriorVariations = false;
 
-        if (interiorVariations != pedVars->variations.end())
+        if (interiorVariations != pedVars.variations.end())
             if (auto it = interiorVariations->second.find(modelid); it != interiorVariations->second.end())
             {
-                pedVars->currentVariations[modelid] = it->second;
+                pedVars.currentVariations[modelid] = it->second;
                 modelHasInteriorVariations = true;
             }
 
-        if ((!modelHasInteriorVariations || vectorHasId(pedVars->mergeInteriors, modelid)) && zoneVariations != pedVars->variations.end())
+        if ((!modelHasInteriorVariations || vectorHasId(pedVars.mergeInteriors, modelid)) && zoneVariations != pedVars.variations.end())
         {
             if (auto it = zoneVariations->second.find(modelid); it != zoneVariations->second.end())
-                pedVars->currentVariations[modelid] = vectorUnion(it->second, pedVars->currentVariations[modelid]);
+                pedVars.currentVariations[modelid] = vectorUnion(it->second, pedVars.currentVariations[modelid]);
         }
 
         if (wanted)
         {
             const unsigned int wantedLevel = wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0);
-            if (auto it = pedVars->wantedVariations.find(modelid); it != pedVars->wantedVariations.end())
+            if (auto it = pedVars.wantedVariations.find(modelid); it != pedVars.wantedVariations.end())
             {
-                if (!it->second[wantedLevel].empty() && !pedVars->currentVariations[modelid].empty())
-                    vectorfilterVector(pedVars->currentVariations[modelid], it->second[wantedLevel]);
+                if (!it->second[wantedLevel].empty() && !pedVars.currentVariations[modelid].empty())
+                    vectorfilterVector(pedVars.currentVariations[modelid], it->second[wantedLevel]);
             }
         }
 
         if (weatherState.isRainy)
         {
-            auto it = pedVars->weatherRainy.find(modelid);
-            if (it != pedVars->weatherRainy.end() && !it->second.empty())
-                vectorfilterVector(pedVars->currentVariations[modelid], it->second);
+            auto it = pedVars.weatherRainy.find(modelid);
+            if (it != pedVars.weatherRainy.end() && !it->second.empty())
+                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
         }
 
         if (weatherState.isSandstorm)
         {
-            auto it = pedVars->weatherSandstorm.find(modelid);
-            if (it != pedVars->weatherSandstorm.end() && !it->second.empty())
-                vectorfilterVector(pedVars->currentVariations[modelid], it->second);
+            auto it = pedVars.weatherSandstorm.find(modelid);
+            if (it != pedVars.weatherSandstorm.end() && !it->second.empty())
+                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
         }
 
         if (weatherState.isFoggy)
         {
-            auto it = pedVars->weatherFoggy.find(modelid);
-            if (it != pedVars->weatherFoggy.end() && !it->second.empty())
-                vectorfilterVector(pedVars->currentVariations[modelid], it->second);
+            auto it = pedVars.weatherFoggy.find(modelid);
+            if (it != pedVars.weatherFoggy.end() && !it->second.empty())
+                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
         }
 
         if (weatherState.isWindy)
         {
-            auto it = pedVars->weatherWindy.find(modelid);
-            if (it != pedVars->weatherWindy.end() && !it->second.empty())
-                vectorfilterVector(pedVars->currentVariations[modelid], it->second);
+            auto it = pedVars.weatherWindy.find(modelid);
+            if (it != pedVars.weatherWindy.end() && !it->second.empty())
+                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
         }
 
         if (weatherState.isSunny)
         {
-            auto it = pedVars->weatherSunny.find(modelid);
-            if (it != pedVars->weatherSunny.end() && !it->second.empty())
-                vectorfilterVector(pedVars->currentVariations[modelid], it->second);
+            auto it = pedVars.weatherSunny.find(modelid);
+            if (it != pedVars.weatherSunny.end() && !it->second.empty())
+                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
         }
 
-        if (auto it = pedVars->activeTimeGroups.find(modelid); it != pedVars->activeTimeGroups.end())
+        if (auto it = pedVars.activeTimeGroups.find(modelid); it != pedVars.activeTimeGroups.end())
             for (auto i : it->second)
-                vectorfilterVector(pedVars->currentVariations[modelid], pedVars->timeGroups[modelid][i].variations);
+                vectorfilterVector(pedVars.currentVariations[modelid], pedVars.timeGroups[modelid][i].variations);
     }
 }
 
@@ -572,7 +572,7 @@ void PedVariations::DrawDebugInfo(float fontSize)
 
         std::string nextLine;
        
-        if (auto it = pedVars->originalModels.find(ped->m_nModelIndex); it != pedVars->originalModels.end())
+        if (auto it = pedVars.originalModels.find(ped->m_nModelIndex); it != pedVars.originalModels.end())
         {
             nextLine = "Parent model: " + std::to_string(it->second);
             CFont::PrintString(screenPos.x, screenPos.y + lineOffset * 2.0f, nextLine.c_str());
@@ -596,12 +596,12 @@ void PedVariations::LogCurrentVariations()
     if (!Log::Write("pedCurrentVariations"))
         return;
 
-    if (pedVars->currentVariations.empty())
+    if (pedVars.currentVariations.empty())
         Log::Write(" is empty\n");
     else
         Log::Write("\n");
 
-    for (auto it : pedVars->currentVariations)
+    for (auto it : pedVars.currentVariations)
         if (!it.second.empty())
         {
             Log::Write("%d: ", it.first);
@@ -634,7 +634,7 @@ void PedVariations::LogVariations()
         return;
 
     std::map<unsigned short, std::set<unsigned short>> variationsMap;
-    for (const auto& it : pedVars->variations)
+    for (const auto& it : pedVars.variations)
     {
         for (const auto &i : it.second)
             for (auto j : i.second)
@@ -673,11 +673,11 @@ int __cdecl getKillsByPlayer(int player)
 template <std::uintptr_t address>
 void __fastcall SetModelIndexHooked(CEntity* _this, void*, const int index)
 {
-    if (index < 7 || index > 65535 || (vectorHasId(pedVars->disableOnMission, index) && CTheScripts__IsPlayerOnAMission()))
+    if (index < 7 || index > 65535 || (vectorHasId(pedVars.disableOnMission, index) && CTheScripts__IsPlayerOnAMission()))
         return callMethodOriginal<address>(_this, index);
 
-    auto it = pedVars->currentVariations.find((unsigned short)index);
-    if (isValidPedId(index) && it != pedVars->currentVariations.end() && !it->second.empty())
+    auto it = pedVars.currentVariations.find((unsigned short)index);
+    if (isValidPedId(index) && it != pedVars.currentVariations.end() && !it->second.empty())
     {
         const unsigned short newModel = vectorGetRandom(it->second);
         if (newModel > 0 && newModel != index)
@@ -690,7 +690,7 @@ void __fastcall SetModelIndexHooked(CEntity* _this, void*, const int index)
                     
             callMethodOriginal<address>(_this, newModel);
 
-            if (!vectorHasId(pedVars->dontInheritBehaviourModels, index))
+            if (!vectorHasId(pedVars.dontInheritBehaviourModels, index))
                 _this->m_nModelIndex = (unsigned short)index;
             variationModel = newModel;
             return;
@@ -705,7 +705,7 @@ void __fastcall UpdateRpHAnimHooked(CPed* entity)
 {
     callMethodOriginal<address>(entity);
 
-    if (auto it = pedVars->animGroups.find(variationModel > 0 ? variationModel : entity->m_nModelIndex); it != pedVars->animGroups.end())
+    if (auto it = pedVars.animGroups.find(variationModel > 0 ? variationModel : entity->m_nModelIndex); it != pedVars.animGroups.end())
         entity->m_nAnimGroup = it->second;
 
     if (variationModel > 0)
@@ -723,20 +723,20 @@ char __fastcall CAEPedSpeechAudioEntity__InitialiseHooked(CAEPedSpeechAudioEntit
 
         bool useParentVoice = false;
 
-        if (auto it = pedVars->useParentVoice.find(ped->m_nModelIndex); it != pedVars->useParentVoice.end())
+        if (auto it = pedVars.useParentVoice.find(ped->m_nModelIndex); it != pedVars.useParentVoice.end())
             useParentVoice = it->second;
         else
-            useParentVoice = pedOptions->useParentVoices;
+            useParentVoice = pedOptions.useParentVoices;
 
         if (useParentVoice)
         {
-            auto it = pedVars->originalModels.find(ped->m_nModelIndex);
-            if (it != pedVars->originalModels.end())
+            auto it = pedVars.originalModels.find(ped->m_nModelIndex);
+            if (it != pedVars.originalModels.end())
                 newModel = it->second;
         }
 
-        auto it = pedVars->voices.find(ped->m_nModelIndex);
-        if (it != pedVars->voices.end() && !it->second.empty())
+        auto it = pedVars.voices.find(ped->m_nModelIndex);
+        if (it != pedVars.voices.end() && !it->second.empty())
             newModel = vectorGetRandom(it->second);
 
         if (newModel > 0)
@@ -757,7 +757,7 @@ CPhysical* __fastcall CPhysicalHooked(CPed* _this)
 {
     changedVoices.erase(_this);
     CPhysical* retVal = callMethodOriginalAndReturn<CPhysical*, address>(_this);
-    pedVars->stack.push(_this);
+    pedVars.stack.push(_this);
     return retVal;
 }
 
@@ -930,7 +930,7 @@ void PedVariations::InstallHooks(bool enableSpecialPeds)
 
     hookCall(0x870A4C, CreateNextSubTaskHooked<0x870A4C>, "CTaskComplexCopInCar::CreateNextSubTask", true);
 
-    if (pedOptions->improveCivilianVariety)
+    if (pedOptions.improveCivilianVariety)
     {
         hookCall(0x61302B, PedIsAcceptableInCurrentZoneHooked<0x61302B>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
         hookCall(0x61330D, PedIsAcceptableInCurrentZoneHooked<0x61330D>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
