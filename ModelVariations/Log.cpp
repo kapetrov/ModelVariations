@@ -64,7 +64,7 @@ bool Log::Write(const char* format, ...)
 	if (WriteFile(logfile, buffer.data(), printedLen, &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
 		return false;
 
-	if (printedLen != bytesWritten)
+	if (static_cast<unsigned int>(printedLen) != bytesWritten)
 		return false;
 
 	return true;
@@ -128,7 +128,7 @@ bool Log::LogModifiedAddress(std::uintptr_t address, const char* format, ...)
 	if (WriteFile(logfile, buffer.data(), printedLen, &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
 		return false;
 
-	if (printedLen != bytesWritten)
+	if (static_cast<unsigned int>(printedLen) != bytesWritten)
 		return false;
 
 	modifiedAddresses.insert(address);		

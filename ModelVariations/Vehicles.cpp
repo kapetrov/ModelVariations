@@ -152,7 +152,7 @@ struct tVehVars {
 
     std::set<unsigned short> vehHasVariations;
 
-    std::stack<std::pair<CVehicle*, std::array<std::vector<unsigned short>, 18>>> tuningStack;
+    std::stack<std::pair<CVehicle*, std::array<int, 18>>> tuningStack;
     std::stack<CVehicle*> stack;
 };
 
@@ -477,15 +477,14 @@ void processTuning(CVehicle* veh)
                     partsToInstall[modSlot].push_back(part);
             }
 
-
         auto tuningChance = vehVars.tuningChances.find(veh->m_nModelIndex);
 
-        std::array<bool, 18> slotsToInstall = {};
+        std::array<bool, 18> slotsSelected = {};
         for (unsigned int i = 0; i < 18; i++)
             if (tuningChance != vehVars.tuningChances.end())
-                slotsToInstall[i] = (tuningChance->second == 0) ? false : ((rand<uint32_t>(0, 100) < tuningChance->second) ? true : false);
+                slotsSelected[i] = (tuningChance->second > 0) && (rand<uint32_t>(0, 100) < tuningChance->second);
             else
-                slotsToInstall[i] = (rand<uint32_t>(0, 3) == 0 ? true : false);
+                slotsSelected[i] = rand<uint32_t>(0, 3) == 0;
 
         std::string section;
         if (auto it2 = vehVars.vehModels.find(veh->m_nModelIndex); it2 != vehVars.vehModels.end())
@@ -494,17 +493,28 @@ void processTuning(CVehicle* veh)
             section = std::to_string(veh->m_nModelIndex);
 
         if (dataFile.ReadBoolean(section, "TuningFullBodykit", false))
-            if (slotsToInstall[14] == true || slotsToInstall[15] == true || slotsToInstall[3] == true)
-                slotsToInstall[14] = slotsToInstall[15] = slotsToInstall[3] = true;
+            if (slotsSelected[14] == true || slotsSelected[15] == true || slotsSelected[3] == true)
+                slotsSelected[14] = slotsSelected[15] = slotsSelected[3] = true;
 
-        for (unsigned int i = 0; i < 18; i++)
-            if (slotsToInstall[i] == false)
-                partsToInstall[i].clear();
+        std::array<int, 18> selectedParts;
+        selectedParts.fill(-1);
+        bool install = false;
 
+        for (unsigned int slot = 0; slot < 18; slot++)
+        {
+            if (!slotsSelected[slot])
+                continue;
 
-        //if (logfile.is_open())
-            //logfile << "Installing part " << it->second[0] << " modSlot " << modSlot << std::endl;
-        vehVars.tuningStack.push({ veh, partsToInstall });
+            if (partsToInstall[slot].empty())
+                continue;
+
+            const uint32_t index = rand<uint32_t>(0, partsToInstall[slot].size());
+            selectedParts[slot] = partsToInstall[slot][index];
+            install = true;
+        }
+
+        if (install)
+            vehVars.tuningStack.emplace(veh, selectedParts);
     }
 }
 
@@ -1031,35 +1041,32 @@ void VehicleVariations::Process()
         const auto &it = vehVars.tuningStack.top();
 
         if (IsVehiclePointerValid(it.first))
-            for (auto& slot : it.second)
-                if (!slot.empty())
+            for (int selectedPart : it.second)
+                if (selectedPart > -1)
                 {
-                    const uint32_t i = rand<uint32_t>(0, slot.size());
-
-                    if (slot[i] <= 20)
-                    {
-                        it.first->SetRemap(slot[i]);
-                    }
+                    const unsigned short part = static_cast<unsigned short>(selectedPart);
+                    if (part <= 20)
+                        it.first->SetRemap(part);
                     else
                     {
-                        CStreaming__RequestVehicleUpgrade(slot[i], PRIORITY_REQUEST);
+                        CStreaming__RequestVehicleUpgrade(part, PRIORITY_REQUEST);
                         CStreaming__LoadAllRequestedModels(false);
 
-                        auto loadState1 = CStreamingInfo::ms_pArrayBase[slot[i]].m_nLoadState;
+                        auto partLoadState = CStreamingInfo::ms_pArrayBase[part].m_nLoadState;
                         
-                        if (loadState1 != LOADSTATE_LOADED)
-                            Log::Write("Error loading (%s) tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(loadState1).c_str(), slot[i], modelNames.contains(slot[i]) ? modelNames[slot[i]].c_str() : "", it.first->m_nModelIndex);
+                        if (partLoadState != LOADSTATE_LOADED)
+                            Log::Write("Error loading (%s) tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(partLoadState).c_str(), part, modelNames.contains(part) ? modelNames[part].c_str() : "", it.first->m_nModelIndex);
                         else
                         {
-                            short otherUpgrade = CVehicleModelInfo__CLinkedUpgradeList__FindOtherUpgrade(CVehicleModelInfo__ms_linkedUpgrades, slot[i]);
-                            unsigned char loadState2 = otherUpgrade > -1 ? CStreamingInfo::ms_pArrayBase[otherUpgrade].m_nLoadState : LOADSTATE_NOT_LOADED;
-                            if (otherUpgrade > -1 && loadState2 != LOADSTATE_LOADED)
+                            short otherUpgrade = CVehicleModelInfo__CLinkedUpgradeList__FindOtherUpgrade(CVehicleModelInfo__ms_linkedUpgrades, part);
+                            unsigned char pairLoadState = otherUpgrade > -1 ? CStreamingInfo::ms_pArrayBase[otherUpgrade].m_nLoadState : LOADSTATE_NOT_LOADED;
+                            if (otherUpgrade > -1 && pairLoadState != LOADSTATE_LOADED)
                             {
-                                Log::Write("Error loading (%s) pair tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(loadState2).c_str(), otherUpgrade, modelNames.contains(otherUpgrade) ? modelNames[otherUpgrade].c_str() : "", it.first->m_nModelIndex);
+                                Log::Write("Error loading (%s) pair tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(pairLoadState).c_str(), otherUpgrade, modelNames.contains(otherUpgrade) ? modelNames[otherUpgrade].c_str() : "", it.first->m_nModelIndex);
                                 continue;
                             }
-                            it.first->AddVehicleUpgrade(slot[i]);
-                            CStreaming__SetMissionDoesntRequireModel(slot[i]);
+                            it.first->AddVehicleUpgrade(part);
+                            CStreaming__SetMissionDoesntRequireModel(part);
                             
                             if (otherUpgrade > -1)
                                 CStreaming__SetMissionDoesntRequireModel(otherUpgrade);
