@@ -24,7 +24,7 @@
 #include <chrono>
 
 static const char* dataFileName = "ModelVariations_Peds.ini";
-static DataReader dataFile(dataFileName);
+static DataReader dataFile;
 std::vector<int16_t> destroyedModelCounters;
 
 struct tPedVars {

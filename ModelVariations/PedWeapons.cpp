@@ -16,7 +16,7 @@
 #include <vector>
 
 static const char* dataFileName = "ModelVariations_PedWeapons.ini";
-static DataReader dataFile(dataFileName);
+static DataReader dataFile;
 
 std::unordered_map<unsigned short, std::string> wepPedModels;
 std::unordered_map<unsigned short, std::string> wepVehModels;

@@ -101,7 +101,7 @@ namespace
 }
 
 static const char* dataFileName = "ModelVariations_Vehicles.ini";
-static DataReader dataFile(dataFileName);
+static DataReader dataFile;
 
 unsigned short roadblockModel = 0;
 unsigned short roadblockDriver = 0;

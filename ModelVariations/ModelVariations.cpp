@@ -58,7 +58,7 @@ std::unordered_map<unsigned short, std::string> modelNames;
 int maxPedID = 0;
 
 static const char* dataFileName = "ModelVariations.ini";
-DataReader iniSettings(dataFileName);
+DataReader iniSettings;
 
 std::chrono::steady_clock::time_point lastTime;
 std::chrono::steady_clock::time_point loadTime;

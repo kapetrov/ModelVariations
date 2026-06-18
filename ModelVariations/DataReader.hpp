@@ -23,6 +23,7 @@ enum dataTypeToRead
 class DataReader
 {
 public:
+	DataReader() {};
 	DataReader(const char* filename);
 
 	void Load(const char* filename);
