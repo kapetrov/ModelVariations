@@ -35,7 +35,6 @@ struct tPedVars {
     std::unordered_map<unsigned short, std::set<unsigned short>> activeTimeGroups;
 
 
-    std::map<unsigned short, std::chrono::steady_clock::time_point> pedTimeSinceSpawn;
     std::unordered_map<unsigned short, unsigned short> originalModels;
     std::unordered_map<unsigned short, bool> useParentVoice;
     std::unordered_map<unsigned short, std::vector<unsigned short>> voices;
@@ -327,31 +326,32 @@ void PedVariations::Process()
 
     int variationsUpdateQueued = 0;
 
+    static int lastGameTime = -1;
     int gameTime = (CClock::ms_nGameClockHours * 100 + CClock::ms_nGameClockMinutes);
 
-    for (auto& it : pedVars.activeTimeGroups)
-        for (auto it2 = it.second.begin(); it2 !=it.second.end();)
-        {
-            unsigned short index = *it2;
-
-            if (!isTimeInRange(gameTime, pedVars.timeGroups[it.first][index].start, pedVars.timeGroups[it.first][index].end))
+    if (gameTime != lastGameTime)
+    {
+        lastGameTime = gameTime;
+        for (auto& it : pedVars.activeTimeGroups)
+            for (auto it2 = it.second.begin(); it2 != it.second.end();)
             {
-                it2 = it.second.erase(it2);
-                variationsUpdateQueued = it.first;
-            }
-            else
-            {
-                ++it2;
-            }
-        }
+                unsigned short index = *it2;
 
-    for (const auto& it : pedVars.timeGroups)
-        for (unsigned int i = 0; i < it.second.size(); i++)
-        {
-            if (isTimeInRange(gameTime, it.second[i].start, it.second[i].end))
-                if (pedVars.activeTimeGroups[it.first].insert((unsigned short)i).second == true)
+                if (!isTimeInRange(gameTime, pedVars.timeGroups[it.first][index].start, pedVars.timeGroups[it.first][index].end))
+                {
+                    it2 = it.second.erase(it2);
                     variationsUpdateQueued = it.first;
-        }
+                }
+                else
+                    ++it2;
+            }
+
+        for (const auto& it : pedVars.timeGroups)
+            for (unsigned int i = 0; i < it.second.size(); i++)
+                if (isTimeInRange(gameTime, it.second[i].start, it.second[i].end))
+                    if (pedVars.activeTimeGroups[it.first].insert((unsigned short)i).second == true)
+                        variationsUpdateQueued = it.first;
+    }
 
     if (weatherChanged)
     {
@@ -374,7 +374,6 @@ void PedVariations::Process()
         Log::Write("\n");
         Log::Write("Active time groups\n");
         for (auto it : pedVars.activeTimeGroups)
-        {
             if (!it.second.empty())
             {
                 Log::Write("%d: ", it.first);
@@ -382,7 +381,7 @@ void PedVariations::Process()
                     Log::Write("%u ", j + 1);
                 Log::Write("\n");
             }
-        }
+
         Log::Write("\n\n");
         variationsUpdateQueued = 0;
     }
@@ -418,9 +417,7 @@ void PedVariations::ProcessDrugDealers(bool reset)
     static int dealersFrames = 0;
 
     if (reset)
-    {
         dealersFrames = 0;
-    }
     else
     {
         if (dealersFrames < 10)
@@ -449,6 +446,7 @@ void PedVariations::ProcessDrugDealers(bool reset)
 void PedVariations::UpdateVariations()
 {
     const CWanted* wanted = FindPlayerWanted(-1);
+    const unsigned int wantedLevel = wanted ? (wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0)) : 65535;
     pedVars.currentVariations.clear();
 
     auto player = FindPlayerPed();
@@ -467,20 +465,15 @@ void PedVariations::UpdateVariations()
             }
 
         if ((!modelHasInteriorVariations || vectorHasId(pedVars.mergeInteriors, modelid)) && zoneVariations != pedVars.variations.end())
-        {
             if (auto it = zoneVariations->second.find(modelid); it != zoneVariations->second.end())
                 pedVars.currentVariations[modelid] = vectorUnion(it->second, pedVars.currentVariations[modelid]);
-        }
 
-        if (wanted)
-        {
-            const unsigned int wantedLevel = wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0);
+        if (wantedLevel < 6)
             if (auto it = pedVars.wantedVariations.find(modelid); it != pedVars.wantedVariations.end())
             {
                 if (!it->second[wantedLevel].empty() && !pedVars.currentVariations[modelid].empty())
                     vectorfilterVector(pedVars.currentVariations[modelid], it->second[wantedLevel]);
             }
-        }
 
         if (weatherState.isRainy)
         {

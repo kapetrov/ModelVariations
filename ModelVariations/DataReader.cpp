@@ -194,7 +194,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 			CBaseModelInfo* mInfo = NULL;
 			if (token[0] >= '0' && token[0] <= '9')
 			{
-				if (fromString<int>(token, modelid) && modelid < 0 || modelid > 65535)
+				if (!fromString<int>(token, modelid) || modelid < 0 || modelid > 65535)
 				{
 					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), token);
 					return {};
@@ -284,7 +284,7 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::
 			CBaseModelInfo* mInfo = NULL;
 			if (token[0] >= '0' && token[0] <= '9')
 			{
-				if (fromString<int>(token, modelid) && modelid < 0 || modelid > 65535)
+				if (!fromString<int>(token, modelid) || modelid < 0 || modelid > 65535)
 				{
 					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), token.c_str());
 					return {};
@@ -316,7 +316,7 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::
 				CBaseModelInfo* mInfo = NULL;
 				if (s[0] >= '0' && s[0] <= '9')
 				{
-					if (fromString<int>(s, modelid) && modelid < 0 || modelid > 65535)
+					if (!fromString<int>(s, modelid) || modelid < 0 || modelid > 65535)
 					{
 						Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), s.c_str());
 						return {};

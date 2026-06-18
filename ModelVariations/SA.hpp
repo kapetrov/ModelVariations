@@ -109,14 +109,12 @@ inline unsigned char loadModel(int model, int streamingFlags, bool loadImmediate
     if (model < 1)
         return false;
 
-    unsigned short modelIndex = static_cast<unsigned short>(model);
-
     CStreaming__RequestModel(model, streamingFlags);
 
     if (loadImmediately)
         CStreaming__LoadAllRequestedModels(false);
 
-    return CStreamingInfo::ms_pArrayBase[modelIndex].m_nLoadState;
+    return CStreamingInfo::ms_pArrayBase[static_cast<unsigned short>(model)].m_nLoadState;
 }
 
 inline void destroyPed(CPed* ped)

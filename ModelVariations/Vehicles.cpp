@@ -118,7 +118,7 @@ std::uintptr_t x6ABCBE_Destination = 0;
 std::uintptr_t x4306A1_Destination = 0;
 
 struct tVehVars {
-    std::array<unsigned short, 65536> originalModels;
+    std::array<unsigned short, 65536> originalModels{};
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
     std::unordered_map<unsigned short, std::array<std::vector<unsigned short>, 6>> wantedVariations;
 
@@ -1028,8 +1028,7 @@ void VehicleVariations::Process()
     
     while (!vehVars.tuningStack.empty())
     {
-        const auto it = vehVars.tuningStack.top();
-        vehVars.tuningStack.pop();
+        const auto &it = vehVars.tuningStack.top();
 
         if (IsVehiclePointerValid(it.first))
             for (auto& slot : it.second)
@@ -1067,6 +1066,8 @@ void VehicleVariations::Process()
                         }
                     }
                 }
+
+        vehVars.tuningStack.pop();
     }
 
     while (!vehVars.stack.empty())
@@ -1278,7 +1279,7 @@ void VehicleVariations::DrawDebugInfo(float fontSize)
         auto parentModel = getVariationOriginalModel(veh->m_nModelIndex);
         if (parentModel != veh->m_nModelIndex)
         {
-            std::snprintf(nextline, sizeof(nextline), "Parent model: %u", parentModel);
+            std::snprintf(nextline, sizeof(nextline), "Parent model: %d", parentModel);
             CFont::PrintString(screenPos.x, screenPos.y + lineOffset, nextline);
             lineOffset += lineOffset;
         }

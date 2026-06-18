@@ -53,15 +53,18 @@ bool Log::Write(const char* format, ...)
 	va_list argptr;
 	va_start(argptr, format);
 
-	vsnprintf(buffer.data(), logBufferSize, format, argptr);
+	auto printedLen = vsnprintf(buffer.data(), logBufferSize, format, argptr);
 
 	va_end(argptr);
 
-	DWORD bytesWritten = 0;
-	if (WriteFile(logfile, buffer.data(), strlen(buffer.data()), &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
+	if (printedLen < 0 || printedLen >= logBufferSize)
 		return false;
 
-	if (strlen(buffer.data()) != bytesWritten)
+	DWORD bytesWritten = 0;
+	if (WriteFile(logfile, buffer.data(), printedLen, &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
+		return false;
+
+	if (printedLen != bytesWritten)
 		return false;
 
 	return true;
@@ -114,15 +117,18 @@ bool Log::LogModifiedAddress(std::uintptr_t address, const char* format, ...)
 	va_list argptr;
 	va_start(argptr, format);
 
-	vsnprintf(buffer.data(), logBufferSize, format, argptr);
+	auto printedLen = vsnprintf(buffer.data(), logBufferSize, format, argptr);
 
 	va_end(argptr);
 
-	DWORD bytesWritten = 0;
-	if (WriteFile(logfile, buffer.data(), strlen(buffer.data()), &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
+	if (printedLen < 0 || printedLen >= logBufferSize)
 		return false;
 
-	if (strlen(buffer.data()) != bytesWritten)
+	DWORD bytesWritten = 0;
+	if (WriteFile(logfile, buffer.data(), printedLen, &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
+		return false;
+
+	if (printedLen != bytesWritten)
 		return false;
 
 	modifiedAddresses.insert(address);		
