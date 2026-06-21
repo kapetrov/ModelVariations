@@ -122,7 +122,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		size_t start = trimmed.find('{');
 		size_t end = trimmed.find('}', start);
 
-		if (start != std::string::npos && end > start) 
+		if (start != std::string::npos && end != std::string::npos && end > start) 
 		{
 			int n = 0;
 			if (fromString<int>(trimmed.substr(start + 1, end - start - 1), n) && n > 0 && n < 10000)

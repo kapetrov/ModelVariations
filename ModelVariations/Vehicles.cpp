@@ -532,6 +532,9 @@ void checkNumGroups(std::vector<unsigned short>& vec, uint8_t numGroups)
 
 void processOccupantGroups(const CVehicle* veh)
 {
+    if (veh == NULL)
+        return;
+
     if (vectorHasId(vehVars.useOnlyGroups, veh->m_nModelIndex) || rand<bool>())
     {
         std::vector<unsigned short> zoneGroups;
@@ -543,7 +546,7 @@ void processOccupantGroups(const CVehicle* veh)
         if (!zoneGroups.empty())
         {
             const CWanted* wanted = FindPlayerWanted(-1);
-            const unsigned int wantedLevel = wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0);
+            const unsigned int wantedLevel = wanted ? (wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0)) : 0;
             currentOccupantsModel = veh->m_nModelIndex;
             if (auto it = vehVars.groupWantedVariations.find(veh->m_nModelIndex); it != vehVars.groupWantedVariations.end())
                 vectorfilterVector(zoneGroups, it->second[wantedLevel]);

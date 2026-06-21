@@ -47,7 +47,6 @@ std::unordered_map<std::string, std::vector<std::string>> areas;
 std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 
 
-std::set<std::uintptr_t> callChecks;
 std::set<unsigned short> referenceCountModels;
 std::set<unsigned short> addedIDsInGroups;
 
@@ -100,7 +99,7 @@ int reloadKey = 0;
 int debugKey = 0;
 
 //debugDrawOptions
-float debugDrawSize = 0.42f;
+float debugDrawSize = 0.28f;
 float debugDrawX = 20.0f;
 float debugDrawY = 340.0f;
 
@@ -883,6 +882,8 @@ void __cdecl CGame__ProcessHooked()
     int seconds = static_cast<int>(totalTimeSinceLoad.count() / 1000.0);
     if (enableLog && (seconds / 30) != secSinceLastModuleCheck) //every 30 seconds
     {
+        static std::set<std::uintptr_t> callChecks;
+
         secSinceLastModuleCheck = seconds / 30;
         for (auto& it : hookedCalls)
         {
