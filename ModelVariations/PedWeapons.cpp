@@ -27,6 +27,7 @@ std::vector<unsigned short> pedHasWeaponVariations;
 std::vector<std::pair<CPed*, int>> weaponWatchers;
 const char* slotStrings[13] = {"SLOT0", "SLOT1", "SLOT2", "SLOT3", "SLOT4", "SLOT5", "SLOT6", "SLOT7", "SLOT8", "SLOT9", "SLOT10", "SLOT11", "SLOT12"};
 bool iniHasGlobal = false;
+bool weaponforceClearsWeapons = true;
 
 int lastMissionLoaded = -1;
 
@@ -62,6 +63,8 @@ void PedWeaponVariations::ClearData()
 void PedWeaponVariations::LoadData()
 {
     dataFile.Load(dataFileName);
+
+    weaponforceClearsWeapons = dataFile.ReadBoolean("Settings", "WeaponforceClearsWeapons", true);
 
     Log::Write("\nReading ped weapon data...\n");
 
@@ -120,7 +123,7 @@ void PedWeaponVariations::Process()
 
         bool wepChanged = false;
 
-        const auto changeWeapon = [&](const std::string& section, const std::string& key, eWeaponType originalWeaponId = WEAPONTYPE_UNARMED) -> bool
+        const auto changeWeapon = [&](const std::string& section, const std::string& key) -> bool
         {
             std::vector<unsigned short> vec = dataFile.ReadLine(section, key, READ_WEAPONS);
             if (!vec.empty())
@@ -143,15 +146,15 @@ void PedWeaponVariations::Process()
                         return false;
                     }
 
-                    if (originalWeaponId > WEAPONTYPE_UNARMED)
-                        ped->ClearWeapon(originalWeaponId);
-                    else
-                        ped->ClearWeapons();
+                    bool isWeaponforce = key.find("WEAPONFORCE") != std::string::npos;
 
+                    if (weaponforceClearsWeapons && isWeaponforce)
+                        ped->ClearWeapons();
+                        
                     ped->GiveWeapon(weaponId, 9999, true);
 
-                    if (originalWeaponId == WEAPONTYPE_UNARMED)
-                        ped->SetCurrentWeapon((int)wInfo->m_nSlot);
+                    if (isWeaponforce)
+                        ped->SetCurrentWeapon(weaponId);
 
                     wepChanged = true;
                     return true;
@@ -243,17 +246,17 @@ void PedWeaponVariations::Process()
                                 bool changeZoneWeapon = true;
                                 bool changeZoneSlot = true;
 
-                                if (changeWeapon(activeSection, wantedVehString + slotStrings[i], ped->m_aWeapons[i].m_eWeaponType))
+                                if (changeWeapon(activeSection, wantedVehString + slotStrings[i]))
                                     changeZoneSlot = rand<bool>();
 
                                 if ((changeZoneSlot || !mergeWeapons))
-                                    changeWeapon(activeSection, wantedVehZoneString + slotStrings[i], ped->m_aWeapons[i].m_eWeaponType);
+                                    changeWeapon(activeSection, wantedVehZoneString + slotStrings[i]);
 
-                                if (changeWeapon(activeSection, wantedVehString + weaponStrings[i], ped->m_aWeapons[i].m_eWeaponType))
+                                if (changeWeapon(activeSection, wantedVehString + weaponStrings[i]))
                                     changeZoneWeapon = rand<bool>();
 
                                 if ((changeZoneWeapon || !mergeWeapons))
-                                    changeWeapon(activeSection, wantedVehZoneString + weaponStrings[i], ped->m_aWeapons[i].m_eWeaponType);
+                                    changeWeapon(activeSection, wantedVehZoneString + weaponStrings[i]);
                             }
 
                         if (wepChanged)
