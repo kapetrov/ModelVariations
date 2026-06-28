@@ -1,4 +1,5 @@
 #include "Log.hpp"
+#include "FuncUtil.hpp"
 
 #include <cstdarg>
 #include <mutex>
@@ -48,23 +49,21 @@ bool Log::Write(const char* format, ...)
 	if (logfile == INVALID_HANDLE_VALUE)
 		return false;
 
-	static thread_local std::vector<char> buffer(logBufferSize);
-
 	va_list argptr;
 	va_start(argptr, format);
 
-	auto printedLen = vsnprintf(buffer.data(), logBufferSize, format, argptr);
+	auto out = mvsprintf(format, argptr);
 
 	va_end(argptr);
 
-	if (printedLen < 0 || printedLen >= logBufferSize)
+	if (out.empty())
 		return false;
 
 	DWORD bytesWritten = 0;
-	if (WriteFile(logfile, buffer.data(), printedLen, &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
+	if (WriteFile(logfile, out.data(), out.size(), &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
 		return false;
 
-	if (static_cast<unsigned int>(printedLen) != bytesWritten)
+	if (out.size() != bytesWritten)
 		return false;
 
 	return true;
@@ -112,23 +111,21 @@ bool Log::LogModifiedAddress(std::uintptr_t address, const char* format, ...)
 	if (logfile == INVALID_HANDLE_VALUE || modifiedAddresses.contains(address))
 		return false;
 
-	static thread_local std::vector<char> buffer(logBufferSize);
-
 	va_list argptr;
 	va_start(argptr, format);
 
-	auto printedLen = vsnprintf(buffer.data(), logBufferSize, format, argptr);
+	auto out = mvsprintf(format, argptr);
 
 	va_end(argptr);
 
-	if (printedLen < 0 || printedLen >= logBufferSize)
+	if (out.empty())
 		return false;
 
 	DWORD bytesWritten = 0;
-	if (WriteFile(logfile, buffer.data(), printedLen, &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
+	if (WriteFile(logfile, out.data(), out.size(), &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
 		return false;
 
-	if (static_cast<unsigned int>(printedLen) != bytesWritten)
+	if (out.size() != bytesWritten)
 		return false;
 
 	modifiedAddresses.insert(address);		

@@ -468,7 +468,7 @@ void initialize()
             Log::Write("Streaming memory was set to %u\n", streamingMemoryNew);
         }
         else
-            Log::Write("Streaming memory not increased. Current streaming memory is %d", *streamingMemoryOriginal);
+            Log::Write("Streaming memory not increased. Current streaming memory is %d\n", *streamingMemoryOriginal);
     }
 
     modInitialized = true;
@@ -521,7 +521,7 @@ void refreshOnGameRestart()
     if (finalTime < 1000)
         Log::Write("Time spent loading: %dms.\n", finalTime);
     else
-        Log::Write("Time spent loading: %gs.\n", finalTime / 1000.0);
+        Log::Write("Time spent loading: %fs.\n", finalTime / 1000.0);
 
     Log::Write("-- Restart Finished (%s) --\n", getDatetime(false, true, true).c_str());
 
@@ -628,7 +628,7 @@ void CPopCycle__DisplayHooked()
         CFont::SetJustify(false);
         CFont::SetOrientation(ALIGN_RIGHT);
 
-        char text[64];
+        std::string text;
 
         float x = SCREEN_COORD_RIGHT(debugDrawX);
         float y = SCREEN_COORD_TOP(debugDrawY);
@@ -637,9 +637,9 @@ void CPopCycle__DisplayHooked()
 
         auto PrintDebugLine = [&](const char* format, auto&&... args)
         {
-            sprintf_s(text, sizeof(text), format, std::forward<decltype(args)>(args)...);
+            text = msprintf(format, std::forward<decltype(args)>(args)...);
 
-            CFont::PrintString(x, y + lineOffset * offsetMultiplier, text);
+            CFont::PrintString(x, y + lineOffset * offsetMultiplier, text.c_str());
             offsetMultiplier += 1.0f;
         };
 
@@ -792,7 +792,7 @@ void __cdecl CGame__ProcessHooked()
                             auto moduleInfo = LoadedModules::GetModuleAtAddress(destination);
                             std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
 
-                            if (!strcasestr(moduleInfo.first, "Windows") && _stricmp(moduleName.c_str(), MOD_NAME) != 0)
+                            if (!strcasestr(moduleInfo.first, "Windows") && !strcasecmp(moduleName, MOD_NAME))
                             {
                                 if (moduleName.empty())
                                     jumpsMap["unknown"].push_back({ i, destination, currentByte });
@@ -825,11 +825,10 @@ void __cdecl CGame__ProcessHooked()
             {
                 auto modelType = (mInfo->GetModelType() == MODEL_INFO_VEHICLE) ? "(Vehicle) " : ((mInfo->GetModelType() == MODEL_INFO_PED) ? "(Ped) " : "");
 
-                char warning_string[256] = {};
-                snprintf(warning_string, 255, "WARNING: model %d %shas a reference count of %d\n", i, modelType, mInfo->m_nRefCount);
-                Log::Write(warning_string);
+                std::string warning_string = msprintf("WARNING: model %d %shas a reference count of %d\n", i, modelType, mInfo->m_nRefCount);
+                Log::Write("%s", warning_string.c_str());
 #ifdef _DEBUG
-                MessageBox(NULL, warning_string, "Model Variations", MB_ICONWARNING);
+                MessageBox(NULL, warning_string.c_str(), "Model Variations", MB_ICONWARNING);
 #endif
                 referenceCountModels.insert(static_cast<unsigned short>(i));
             }
@@ -894,7 +893,7 @@ void __cdecl CGame__ProcessHooked()
             std::pair<std::string, MODULEINFO> moduleInfo = LoadedModules::GetModuleAtAddress(functionAddress);
             std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
 
-            if (_stricmp(moduleName.c_str(), MOD_NAME) != 0 && callChecks.insert(it.first).second)
+            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.first).second)
             {
                 if (functionAddress > 0 && !moduleName.empty())
                     Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second.name.c_str(), it.first, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
@@ -913,7 +912,7 @@ void __cdecl CGame__ProcessHooked()
                     auto functionStartModule = LoadedModules::GetModuleAtAddress(functionStartDestination);
                     std::string functionStartModuleName = functionStartModule.first.substr(functionStartModule.first.find_last_of("/\\") + 1);
 
-                    if (_stricmp(functionStartModuleName.c_str(), MOD_NAME) != 0)
+                    if (!strcasecmp(functionStartModuleName, MOD_NAME))
                         Log::LogModifiedAddress((std::uintptr_t)it.second.originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.second.name.c_str(), it.second.originalFunction, functionStartDestination, functionStartModuleName.c_str());
                 }
             }
@@ -926,7 +925,7 @@ void __cdecl CGame__ProcessHooked()
             std::pair<std::string, MODULEINFO> moduleInfo = LoadedModules::GetModuleAtAddress(currentDestination);
             std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
 
-            if (_stricmp(moduleName.c_str(), MOD_NAME) != 0 && callChecks.insert(it.first).second)
+            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.first).second)
             {
                 if (currentDestination > 0 && !moduleName.empty())
                     Log::Write("Modified ASM hook detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second.c_str(), it.first, currentDestination, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
@@ -1080,15 +1079,15 @@ public:
         std::string checkForceEnabled = iniSettings.ReadString("Settings", "ForceEnable", "");
         if (!checkForceEnabled.empty())
         {
-            if (checkForceEnabled == "1" || _stricmp(checkForceEnabled.c_str(), "true") == 0)
+            if (checkForceEnabled == "1" || strcasecmp(checkForceEnabled, "true"))
                 forceEnableGlobal = true;
             else if (checkForceEnabled != "0" && isdigit(checkForceEnabled[0]))
             {
                 for (const auto& s : splitString(checkForceEnabled, ','))
                 {
-                    char* endptr = NULL;
-                    std::uintptr_t value = strtoul(s.c_str(), &endptr, 16);
-                    if (*endptr == 0)
+                    std::uintptr_t value;
+                    auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), value, 16);
+                    if (ec == std::errc{} && ptr == (s.data() + s.size()))
                         forceEnable.insert(value);
                 }
             }

@@ -725,7 +725,7 @@ void VehicleVariations::LoadData()
                 if (kvp.first.size() > 1 && isupper(kvp.first[1]))
                 {
                     uint64_t zoneName = 0;
-                    strncpy((char*)&zoneName, kvp.first.c_str(), 8);
+                    copyString((char*)&zoneName, kvp.first.c_str(), 8);
 
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_VEHICLES);
                     if (!vec.empty())
@@ -957,9 +957,8 @@ void VehicleVariations::Process()
 
     if (variationsUpdateQueued > 0)
     {
-        char gameTimeString[7] = {};
-        snprintf(gameTimeString, 6, "%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
-        Log::Write("Updating vehicle variations due to model %d time groups. Game time: %s\n", variationsUpdateQueued, gameTimeString);
+        std::string gameTimeString = msprintf("%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
+        Log::Write("Updating vehicle variations due to model %d time groups. Game time: %s\n", variationsUpdateQueued, gameTimeString.c_str());
         UpdateVariations();
         VehicleVariations::LogCurrentVariations();
         Log::Write("\n");
@@ -1276,21 +1275,19 @@ void VehicleVariations::DrawDebugInfo(float fontSize)
             continue;
 
         float lineOffset = (RsGlobal.maximumHeight / 640.0f) * fontSize * 35.0f;
-        char line1[32] = {};
-        char line2[64] = {};
-        std::snprintf(line1, sizeof(line1), "0x%08X", reinterpret_cast<std::uintptr_t>(veh));
-        std::snprintf(line2, sizeof(line2), "%u %s", veh->m_nModelIndex, modelNames.contains(veh->m_nModelIndex) ? modelNames[veh->m_nModelIndex].c_str() : "");
+        std::string line1 = msprintf("0x%08X", reinterpret_cast<std::uintptr_t>(veh));
+        std::string line2 = msprintf("%u %s", veh->m_nModelIndex, modelNames.contains(veh->m_nModelIndex) ? modelNames[veh->m_nModelIndex].c_str() : "");       
 
-        CFont::PrintString(screenPos.x, screenPos.y, line1);
-        CFont::PrintString(screenPos.x, screenPos.y + lineOffset, line2);
+        CFont::PrintString(screenPos.x, screenPos.y, line1.c_str());
+        CFont::PrintString(screenPos.x, screenPos.y + lineOffset, line2.c_str());
         lineOffset += lineOffset;
 
-        char nextline[32] = {};
+        
         auto parentModel = getVariationOriginalModel(veh->m_nModelIndex);
         if (parentModel != veh->m_nModelIndex)
         {
-            std::snprintf(nextline, sizeof(nextline), "Parent model: %d", parentModel);
-            CFont::PrintString(screenPos.x, screenPos.y + lineOffset, nextline);
+            std::string nextline = msprintf("Parent model : %d", parentModel);
+            CFont::PrintString(screenPos.x, screenPos.y + lineOffset, nextline.c_str());
             lineOffset += lineOffset;
         }
     }
@@ -1929,20 +1926,20 @@ int __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
                 return callMethodOriginalAndReturn<int, address>(_this);
             }
 
-            char errorString[256] = {};
-            snprintf(errorString, 255, "Couldn't load model %d! The game will probably crash.\n"
-                                       "Load state: %s\n"
-                                       "Reference count: %u\n"
-                                       "Times used: %u\n"
-                                       "Vehicles: %u/%u\n"
-                                       "VehicleStructs: %u/%u\n"
-                                       "Streaming memory: %u/%u MB", index, getLoadStateString(CStreamingInfo::ms_pArrayBase[index].m_nLoadState).c_str(), _this->m_nRefCount, _this->m_nTimesUsed,
-                                                                     CPools::ms_pVehiclePool->GetNoOfUsedSpaces(), CPools::ms_pVehiclePool->m_nSize, 
-                                                                     CVehicleModelInfo__CVehicleStructure__m_pInfoPool->GetNoOfUsedSpaces(),
-                                                                     CVehicleModelInfo__CVehicleStructure__m_pInfoPool->m_nSize,
-                                                                     CStreaming__ms_memoryUsed/1024/1024, CStreaming__ms_memoryAvailable/1024/1024);
-            Log::Write("\n%s\n", errorString);
-            MessageBox(NULL, errorString, "Model Variations", MB_ICONERROR);
+            std::string errorString = 
+            msprintf("Couldn't load model %d! The game will probably crash.\n"
+                     "Load state: %s\n"
+                     "Reference count: %u\n"
+                     "Times used: %u\n"
+                     "Vehicles: %u/%u\n"
+                     "VehicleStructs: %u/%u\n"
+                     "Streaming memory: %u/%u MB", index, getLoadStateString(CStreamingInfo::ms_pArrayBase[index].m_nLoadState).c_str(), _this->m_nRefCount, _this->m_nTimesUsed,
+                                                   CPools::ms_pVehiclePool->GetNoOfUsedSpaces(), CPools::ms_pVehiclePool->m_nSize, 
+                                                   CVehicleModelInfo__CVehicleStructure__m_pInfoPool->GetNoOfUsedSpaces(),
+                                                   CVehicleModelInfo__CVehicleStructure__m_pInfoPool->m_nSize,
+                                                   CStreaming__ms_memoryUsed/1024/1024, CStreaming__ms_memoryAvailable/1024/1024);
+            Log::Write("\n%s\n", errorString.c_str());
+            MessageBox(NULL, errorString.c_str(), "Model Variations", MB_ICONERROR);
             return 0;
         }
     }

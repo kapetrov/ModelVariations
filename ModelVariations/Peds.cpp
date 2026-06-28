@@ -200,14 +200,14 @@ void PedVariations::LoadData()
 
             for (auto& kvp : iniData.second)
             {
-                if (kvp.first.size() > 1 && !islower(kvp.first[1])) //also includes interiors
+                if (kvp.first.size() > 1 && (kvp.first[1] < 'a' || kvp.first[1] > 'z')) //also includes interiors
                 {
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_PEDS);
                     if (!vec.empty())
                     {
                         pedVars.pedHasVariations.insert(modelIndex);
                         uint64_t zoneName = 0;
-                        strncpy((char*)&zoneName, kvp.first.c_str(), 8);
+                        copyString((char*)&zoneName, kvp.first.c_str(), 8);
                         pedVars.variations[zoneName][modelIndex] = mergeZones ? vectorUnion(pedVars.variations[zoneName][modelIndex], vec) : vec;
                     }
                 }
@@ -355,9 +355,8 @@ void PedVariations::Process()
 
     if (weatherChanged)
     {
-        char gameTimeString[7] = {};
-        snprintf(gameTimeString, 6, "%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
-        Log::Write("\n[%s] Updating ped variations due to weather change. Current weather: %d %d %d %d %d. Game time: %s\n", getDatetime(false, true, true).c_str(), isRainy, isSandstorm, isFoggy, isWindy, isSunny, gameTimeString);
+        std::string gameTimeString = msprintf("%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
+        Log::Write("\n[%s] Updating ped variations due to weather change. Current weather: %d %d %d %d %d. Game time: %s\n", getDatetime(false, true, true).c_str(), isRainy, isSandstorm, isFoggy, isWindy, isSunny, gameTimeString.c_str());
         UpdateVariations();
         PedVariations::LogCurrentVariations();
         Log::Write("\n");
@@ -366,9 +365,8 @@ void PedVariations::Process()
 
     if (variationsUpdateQueued > 0)
     {
-        char gameTimeString[7] = {};
-        snprintf(gameTimeString, 6, "%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
-        Log::Write("Updating ped variations due to model %d time groups. Game time: %s\n", variationsUpdateQueued, gameTimeString);
+        std::string gameTimeString = msprintf("%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
+        Log::Write("Updating ped variations due to model %d time groups. Game time: %s\n", variationsUpdateQueued, gameTimeString.c_str());
         UpdateVariations();
         PedVariations::LogCurrentVariations();
         Log::Write("\n");
@@ -555,13 +553,11 @@ void PedVariations::DrawDebugInfo(float fontSize)
             continue;
 
         const float lineOffset = (RsGlobal.maximumHeight / 640.0f) * fontSize * 35.0f;
-        char line1[32] = {};
-        char line2[64] = {};
-        std::snprintf(line1, sizeof(line1), "0x%08X", reinterpret_cast<std::uintptr_t>(ped));
-        std::snprintf(line2, sizeof(line2), "%u %s", ped->m_nModelIndex, modelNames.contains(ped->m_nModelIndex) ? modelNames[ped->m_nModelIndex].c_str() : "");
-
-        CFont::PrintString(screenPos.x, screenPos.y, line1);
-        CFont::PrintString(screenPos.x, screenPos.y + lineOffset, line2);
+        std::string line1 = msprintf("0x%08X", reinterpret_cast<std::uintptr_t>(ped));
+        std::string line2 = msprintf("%u %s", ped->m_nModelIndex, modelNames.contains(ped->m_nModelIndex) ? modelNames[ped->m_nModelIndex].c_str() : "");
+        
+        CFont::PrintString(screenPos.x, screenPos.y, line1.c_str());
+        CFont::PrintString(screenPos.x, screenPos.y + lineOffset, line2.c_str());
 
         std::string nextLine;
        
@@ -573,9 +569,8 @@ void PedVariations::DrawDebugInfo(float fontSize)
 
         if (auto it = changedVoices.find(ped); it != changedVoices.end())
         {
-            char buffer[32] = {};
-            std::snprintf(buffer, sizeof(buffer), "Voice: %u", it->second);
-            CFont::PrintString(screenPos.x, screenPos.y + lineOffset * 3.0f, buffer);
+            std::string buffer = msprintf("Voice: %u", it->second);
+            CFont::PrintString(screenPos.x, screenPos.y + lineOffset * 3.0f, buffer.c_str());
         }
     }
 }

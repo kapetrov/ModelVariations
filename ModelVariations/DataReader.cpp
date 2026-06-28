@@ -83,9 +83,9 @@ float DataReader::ReadFloat(const std::string& section, const std::string& key, 
 bool DataReader::ReadBoolean(const std::string &section, const std::string &key, bool defaultValue)
 {
 	auto str = this->ReadString(section, key, "");
-	if (_stricmp("true", str.c_str()) == 0)
+	if (strcasecmp("true", str))
 		return true;
-	else if (_stricmp("false", str.c_str()) == 0)
+	else if (strcasecmp("false", str))
 		return false;
 
 	return this->ReadInteger(section, key, defaultValue) != 0;
@@ -163,7 +163,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		}
 		else if (parseType == READ_TUNING)
 		{
-			if (_strnicmp(token, "paintjob", 8) == 0)
+			if (strcasecmp(token, "paintjob"))
 			{
 				int paintjob = 0;
 				if (fromString<int>(token + 8, paintjob) && paintjob > 0)
@@ -226,7 +226,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 				if (CStreaming__ms_pExtraObjectsDir->m_nNumEntries >= CStreaming__ms_pExtraObjectsDir->m_nCapacity)
 				{
 					reachedMaxCapacity = true;
-					Log::Write("WARNING: The number of extra object directory entries is has reached max capacity (%u)\n", CStreaming__ms_pExtraObjectsDir->m_nCapacity);
+					Log::Write("WARNING: The number of extra object directory entries has reached max capacity (%u)\n", CStreaming__ms_pExtraObjectsDir->m_nCapacity);
 				}
 				else if (CStreaming__ms_pExtraObjectsDir->FindItem(token) && isAddressValid(mInfo7))
 				{

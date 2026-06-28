@@ -190,7 +190,7 @@ void PedWeaponVariations::Process()
         unsigned int wantedLevel = wanted ? wanted->m_nWantedLevel : 0;
 
         if (player->m_pEnex)
-            strncpy(zoneString, reinterpret_cast<char*>(player->m_pEnex), 8);
+            copyString(zoneString, reinterpret_cast<char*>(player->m_pEnex), 8);
 
         const std::string missionString = (isOnMission) ? ("MISSION" + std::to_string(lastMissionLoaded) + "|") : "";
         const std::string wantedString = (wantedLevel > 0) ? ("WANTED" + std::to_string(wantedLevel) + "|") : "";

@@ -12,6 +12,48 @@ std::string modDirectory;
 std::pair<std::string, MODULEINFO> exeModule;
 
 
+static std::string hashFile(const std::string& filename)
+{
+    HANDLE hFile = CreateFile(getFullPath(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return "";
+
+    if (hFile == INVALID_HANDLE_VALUE)
+        return "";
+
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string hashString;
+    auto filesize = GetFileSize(hFile, NULL);
+
+    if (filesize != INVALID_FILE_SIZE && filesize > 0)
+    {
+        DWORD lpNumberOfBytesRead = 0;
+        BCRYPT_ALG_HANDLE hProvider = NULL;
+        BCRYPT_HASH_HANDLE ctx = NULL;
+        auto filebuf = std::vector<BYTE>(filesize + 1);
+
+        if (ReadFile(hFile, filebuf.data(), filesize, &lpNumberOfBytesRead, NULL) && lpNumberOfBytesRead == filesize)
+            if (BCryptOpenAlgorithmProvider(&hProvider, BCRYPT_SHA256_ALGORITHM, NULL, 0) == STATUS_SUCCESS)
+                if (BCryptCreateHash(hProvider, &ctx, NULL, 0, NULL, 0, 0) == STATUS_SUCCESS && ctx != NULL)
+                {
+                    auto hashArray = std::vector<BYTE>(32);
+                    BCryptHashData(ctx, filebuf.data(), filesize, 0);
+                    BCryptFinishHash(ctx, hashArray.data(), 32, 0);
+                    BCryptDestroyHash(ctx);
+                    BCryptCloseAlgorithmProvider(hProvider, 0);
+
+                    for (BYTE i : hashArray)
+                    {
+                        hashString += hex[(i >> 4) & 0x0F];
+                        hashString += hex[i & 0x0F];
+                    }
+                }
+    }
+
+    CloseHandle(hFile);
+    return hashString;
+}
+
 std::pair<std::string, MODULEINFO> LoadedModules::GetModuleAtAddress(std::uintptr_t address)
 {
     if (address)
@@ -31,7 +73,7 @@ std::pair<std::string, MODULEINFO> LoadedModules::GetModule(const std::string &n
         if (exactMatch)
         {
             auto filename = getFilenameFromPath(i.first);
-            if (_stricmp(filename.c_str(), name.c_str()) == 0)
+            if (strcasecmp(filename, name))
                 return i;
         }
         else if (strcasestr(i.first, name))
@@ -103,7 +145,7 @@ void LoadedModules::Refresh()
                     loadedMods[MOD_FLA] = true;
 
 #ifdef _DEBUG
-                assert(_stricmp("ModelVariations.asi", getFilenameFromPath(szModName).c_str()) != 0);
+                assert(!strcasecmp("ModelVariations.asi", getFilenameFromPath(szModName)));
 #endif
                 MODULEINFO mInfo;
                 if (modules[i] && GetModuleInformation(hProcess, modules[i], &mInfo, sizeof(MODULEINFO)))
