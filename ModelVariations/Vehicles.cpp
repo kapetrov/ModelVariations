@@ -15,7 +15,6 @@
 #include <CModelInfo.h>
 #include <CPlane.h>
 #include <CSprite.h>
-#include <CStreaming.h>
 #include <CTheZones.h>
 #include <CVector.h>
 #include <CVehicle.h>
@@ -222,7 +221,7 @@ bool isVehicleVisible(CVehicle* veh)
     if (mat == NULL)
         return false;
 
-    const CVector camPos = TheCamera.m_vecGameCamPos;
+    const CVector camPos = *reinterpret_cast<CVector*>(0xB6F930);
 
     auto LocalToWorld = [&](const CVector& local) -> CVector {
         return CVector(
@@ -415,7 +414,7 @@ int getPedModelForCopType(int ctype)
     switch (ctype) 
     {
         case COP_TYPE_CITYCOP:
-            return CStreaming::GetDefaultCopModel();
+            return CStreaming__GetDefaultCopModel();
         case COP_TYPE_LAPDM1:
             return MODEL_LAPDM1;
         case COP_TYPE_CSHER:
@@ -1606,7 +1605,7 @@ int __cdecl GetDefaultCopModelHooked()
     if (retVal == 0)
     {
         Log::Write("GetDefaultCopModel: Error! Returned model is 0. Trying to get model manually... ");
-        int model = CStreaming::ms_aDefaultCopModel[CTheZones::m_CurrLevel];
+        int model = reinterpret_cast<int*>(0x8A5AA0)[CTheZones::m_CurrLevel];
         if (model > 0 && model < 65535)
         {
             Log::Write("OK. Using model %d\n", model);

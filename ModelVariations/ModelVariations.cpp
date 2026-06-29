@@ -566,8 +566,8 @@ void __cdecl RetryLoadFileHooked(int streamNum)
 {
     Log::Write("RetryLoadFile called for the following IDs in channel %d: ", streamNum);
 
-    for (auto i : CStreaming::ms_channel[streamNum].modelIds)
-        Log::Write("%d ", i);
+    for (int i = 0; i < 16; i++)
+        Log::Write("%d ", *reinterpret_cast<int*>(0x8E4A60 + streamNum * 0x98 + i * sizeof(int)));
     Log::Write("\n");
 
     callOriginal<address>(streamNum);

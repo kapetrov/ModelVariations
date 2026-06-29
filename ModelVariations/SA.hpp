@@ -64,11 +64,14 @@ inline bool CPhysical__TestCollision(CPhysical* _this, bool applySpeed) { return
 #define CStreaming__ms_memoryUsed (*getPointerFromAddress<uint32_t>(0x408ACA, 0x8E4CB4))
 #define CStreaming__ms_numPedsLoaded (*getPointerFromAddress<int>(0x40A71F, 0x8E4BB0))
 #define CStreaming__ms_vehiclesLoaded getPointerFromAddress<CLoadedCarGroup>(0x40B997, 0x8E4C24)
+inline int CStreaming__GetDefaultCopModel() { return getDynamicFunction<int, 0x5DDCA8, 0x407C00>(); }
 inline void CStreaming__LoadAllRequestedModels(bool bOnlyPriorityRequests) { getDynamicFunction<void, 0x49B421, 0x40EA10>(bOnlyPriorityRequests); }
 inline void CStreaming__RequestModel(int model, int flags) { getDynamicFunction<void, 0x40A612, 0x4087E0>(model, flags); }
 inline void CStreaming__RequestSpecialModel(int slot, const char* name, int flags) { getDynamicFunction<void, 0x40B45E, 0x409D10>(slot, name, flags); }
 inline void CStreaming__RequestVehicleUpgrade(int model, int flags) { getDynamicFunction<void, 0x447E83, 0x408C70>(model, flags); }
 inline void CStreaming__SetMissionDoesntRequireModel(int model) { getDynamicFunction<void, 0x40B49D, 0x409C90>(model); }
+inline void CStreaming__SetModelIsDeletable(int model) { getDynamicFunction<void, 0x40A2AD, 0x409C10>(model); }
+inline void CStreaming__SetModelTxdIsDeletable(int model) { getDynamicFunction<void, 0x43A15A, 0x409C70>(model); }
 
 inline bool CTheScripts__IsPlayerOnAMission() { return getDynamicFunction<bool, 0x571582, 0x464D50>(); }
 inline void CTheScripts__RemoveThisPed(void* ped) { getDynamicFunction<void, 0x409DE2, 0x486240>(ped); }

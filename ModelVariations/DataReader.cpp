@@ -6,7 +6,6 @@
 
 #include <CModelInfo.h>
 #include <CPedModelInfo.h>
-#include <CStreaming.h>
 #include <CWeaponInfo.h>
 
 DataReader::DataReader(const char* filename)
@@ -240,8 +239,8 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 							{
 								pedInfo->SetColModel((CColModel*)0x968DF0, false);
 								CStreaming__RequestSpecialModel(i, token, 0);
-								CStreaming::SetModelIsDeletable(i);
-								CStreaming::SetModelTxdIsDeletable(i);
+								CStreaming__SetModelIsDeletable(i);
+								CStreaming__SetModelTxdIsDeletable(i);
 								for (int j = 0; j < multiplier; j++)
 									retVector.push_back(i);
 								modelNames[i] = token;

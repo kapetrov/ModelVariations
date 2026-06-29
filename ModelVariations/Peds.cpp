@@ -101,7 +101,7 @@ bool isPedVisible(CPed* ped)
     if (ped == NULL)
         return false;
 
-    CVector camPos = TheCamera.m_vecGameCamPos;
+    CVector camPos = *reinterpret_cast<CVector*>(0xB6F930);
     CVector targetPos = ped->GetPosition();
 
     CColPoint hitPoint;
