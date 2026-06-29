@@ -1323,8 +1323,7 @@ void VehicleVariations::LogDataFile()
     else
     {
         Log::Write("%s\n", printFilenameWithBorder(dataFileName, '#').c_str());
-        Log::LogTextFile(dataFileName);
-        Log::Write("\n");
+        Log::Write("%s\n", fileToString(dataFileName).c_str());
     }
 }
 

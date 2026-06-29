@@ -69,41 +69,6 @@ bool Log::Write(const char* format, ...)
 	return true;
 }
 
-bool Log::LogTextFile(const std::string& filename)
-{
-	std::lock_guard<std::mutex> lock(logMutex);
-
-	if (logfile == INVALID_HANDLE_VALUE)
-		return false;
-
-	HANDLE inFile = CreateFile(filename.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (inFile == INVALID_HANDLE_VALUE)
-		return false;
-
-	auto filesize = GetFileSize(inFile, NULL);
-	if (filesize == INVALID_FILE_SIZE)
-	{
-		CloseHandle(inFile);
-		return false;
-	}
-
-	std::string fileString(filesize, 0);
-
-	DWORD lpNumberOfBytesRead = 0;
-	ReadFile(inFile, &fileString[0], filesize, &lpNumberOfBytesRead, NULL);
-
-	CloseHandle(inFile);
-
-	DWORD bytesWritten = 0;
-	if (WriteFile(logfile, fileString.data(), fileString.size(), &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
-		return false;
-
-	if (fileString.size() != bytesWritten)
-		return false;
-
-	return true;	
-}
-
 bool Log::LogModifiedAddress(std::uintptr_t address, const char* format, ...)
 {
 	std::lock_guard<std::mutex> lock(logMutex);
