@@ -1,6 +1,7 @@
 #pragma once
 
 extern char currentZone[9];
+extern std::chrono::milliseconds gameplayTimeSinceLoad;
 
 class PedWeaponVariations
 {

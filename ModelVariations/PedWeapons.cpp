@@ -25,6 +25,8 @@ std::stack<CPed*> pedWepStack;
 
 std::vector<unsigned short> pedHasWeaponVariations;
 std::vector<std::pair<CPed*, int>> weaponWatchers;
+std::map<CPed*, std::chrono::milliseconds> delayedPeds;
+
 const char* slotStrings[13] = {"SLOT0", "SLOT1", "SLOT2", "SLOT3", "SLOT4", "SLOT5", "SLOT6", "SLOT7", "SLOT8", "SLOT9", "SLOT10", "SLOT11", "SLOT12"};
 bool iniHasGlobal = false;
 
@@ -33,6 +35,7 @@ int lastMissionLoaded = -1;
 struct tPedWeaponOptions {
     bool weaponforceClearsWeapons = false;
     bool skipScriptedPeds = false;
+    int giveWeaponDelay = 0;
 };
 
 static tPedWeaponOptions pedWeaponOptions;
@@ -74,6 +77,7 @@ void PedWeaponVariations::LoadData()
 
     pedWeaponOptions.weaponforceClearsWeapons = dataFile.ReadBoolean("Settings", "WeaponforceClearsWeapons", false);
     pedWeaponOptions.skipScriptedPeds = dataFile.ReadBoolean("Settings", "SkipScriptedPeds", false);
+    pedWeaponOptions.giveWeaponDelay = dataFile.ReadInteger("Settings", "GiveWeaponDelay", false);
 
     Log::Write("\nReading ped weapon data...\n");
 
@@ -122,16 +126,45 @@ void PedWeaponVariations::LoadData()
 
 void PedWeaponVariations::Process()
 {
+    std::vector<CPed*> pedsToPush;
+
     while (!pedWepStack.empty())
     {
         CPed* ped = pedWepStack.top();
         pedWepStack.pop();
 
-        if (!IsPedPointerValid(ped) || ped->m_nModelIndex < 7 || (!vectorHasId(pedHasWeaponVariations, ped->m_nModelIndex) && !iniHasGlobal))
+        if (!IsPedPointerValid(ped))
+        {
+            delayedPeds.erase(ped);
+            continue;
+        }
+
+        if (ped->m_nModelIndex < 7 || (!vectorHasId(pedHasWeaponVariations, ped->m_nModelIndex) && !iniHasGlobal))
             continue;
 
         if (pedWeaponOptions.skipScriptedPeds && ped->m_nCreatedBy == 2)
             continue;
+
+        if (pedWeaponOptions.giveWeaponDelay > 0)
+        {
+            auto it = delayedPeds.find(ped);
+            if (it != delayedPeds.end())
+            {
+                if ((gameplayTimeSinceLoad - it->second) > std::chrono::milliseconds(pedWeaponOptions.giveWeaponDelay * 1000))
+                    delayedPeds.erase(ped);
+                else
+                {
+                    pedsToPush.push_back(ped);
+                    continue;
+                }
+            }
+            else
+            {
+                delayedPeds[ped] = gameplayTimeSinceLoad;
+                pedsToPush.push_back(ped);
+                continue;
+            }
+        }
 
         bool wepChanged = false;
 
@@ -277,6 +310,9 @@ void PedWeaponVariations::Process()
                 }
             }
     }
+
+    for (auto ped : pedsToPush)
+        pedWepStack.push(ped);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
