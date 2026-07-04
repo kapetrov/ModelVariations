@@ -27,9 +27,15 @@ std::vector<unsigned short> pedHasWeaponVariations;
 std::vector<std::pair<CPed*, int>> weaponWatchers;
 const char* slotStrings[13] = {"SLOT0", "SLOT1", "SLOT2", "SLOT3", "SLOT4", "SLOT5", "SLOT6", "SLOT7", "SLOT8", "SLOT9", "SLOT10", "SLOT11", "SLOT12"};
 bool iniHasGlobal = false;
-bool weaponforceClearsWeapons = true;
 
 int lastMissionLoaded = -1;
+
+struct tPedWeaponOptions {
+    bool weaponforceClearsWeapons = false;
+    bool skipScriptedPeds = false;
+};
+
+static tPedWeaponOptions pedWeaponOptions;
 
 bool isIdValidForWatcher(unsigned short id)
 {
@@ -57,6 +63,8 @@ void PedWeaponVariations::ClearData()
     pedHasWeaponVariations.clear();
     iniHasGlobal = false;
 
+    pedWeaponOptions = {};
+
     dataFile.data.clear();
 }
 
@@ -64,7 +72,8 @@ void PedWeaponVariations::LoadData()
 {
     dataFile.Load(dataFileName);
 
-    weaponforceClearsWeapons = dataFile.ReadBoolean("Settings", "WeaponforceClearsWeapons", true);
+    pedWeaponOptions.weaponforceClearsWeapons = dataFile.ReadBoolean("Settings", "WeaponforceClearsWeapons", false);
+    pedWeaponOptions.skipScriptedPeds = dataFile.ReadBoolean("Settings", "SkipScriptedPeds", false);
 
     Log::Write("\nReading ped weapon data...\n");
 
@@ -121,6 +130,9 @@ void PedWeaponVariations::Process()
         if (!IsPedPointerValid(ped) || ped->m_nModelIndex < 7 || (!vectorHasId(pedHasWeaponVariations, ped->m_nModelIndex) && !iniHasGlobal))
             continue;
 
+        if (pedWeaponOptions.skipScriptedPeds && ped->m_nCreatedBy == 2)
+            continue;
+
         bool wepChanged = false;
 
         const auto changeWeapon = [&](const std::string& section, const std::string& key) -> bool
@@ -148,7 +160,7 @@ void PedWeaponVariations::Process()
 
                     bool isWeaponforce = key.find("WEAPONFORCE") != std::string::npos;
 
-                    if (weaponforceClearsWeapons && isWeaponforce)
+                    if (pedWeaponOptions.weaponforceClearsWeapons && isWeaponforce)
                         ped->ClearWeapons();
                         
                     ped->GiveWeapon(weaponId, 9999, true);
