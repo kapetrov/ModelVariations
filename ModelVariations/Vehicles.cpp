@@ -961,18 +961,20 @@ void VehicleVariations::Process()
         UpdateVariations();
         VehicleVariations::LogCurrentVariations();
         Log::Write("\n");
-        Log::Write("Active time groups\n");
-        for (auto it : vehVars.activeTimeGroups)
+        if (Log::Write("Active time groups\n"))
         {
-            if (!it.second.empty())
+            for (auto it : vehVars.activeTimeGroups)
             {
-                Log::Write("%d: ", it.first);
-                for (auto j : it.second)
-                    Log::Write("%u ", j + 1);
-                Log::Write("\n");
+                if (!it.second.empty())
+                {
+                    Log::Write("%d: ", it.first);
+                    for (auto j : it.second)
+                        Log::Write("%u ", j + 1);
+                    Log::Write("\n");
+                }
             }
+            Log::Write("\n\n");
         }
-        Log::Write("\n\n");
         variationsUpdateQueued = 0;
     }
 
@@ -1322,8 +1324,8 @@ void VehicleVariations::LogDataFile()
         Log::Write("\n%s not found!\n\n", dataFileName);
     else
     {
-        Log::Write("%s\n", printFilenameWithBorder(dataFileName, '#').c_str());
-        Log::Write("%s\n", fileToString(dataFileName).c_str());
+        if (Log::Write("%s\n", printFilenameWithBorder(dataFileName, '#').c_str()))
+            Log::Write("%s\n", fileToString(dataFileName).c_str());
     }
 }
 

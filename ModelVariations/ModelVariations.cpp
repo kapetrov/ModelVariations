@@ -401,13 +401,15 @@ void initialize()
         if (maxPedID == 0 && flaMaxID > -1)
             maxPedID = flaMaxID;
 
-        Log::Write("\n");
-        Log::Write("%s\n", printFilenameWithBorder(flaIniPath.substr(flaIniPath.find_last_of("/\\") + 1), '#').c_str());
-        for (auto &i : flaIni.data)
+        if (Log::Write("\n"))
         {
-            Log::Write("[%s]\n", i.first.c_str());
-            for (auto& j : i.second)
-                Log::Write("%s = %s\n\n", j.first.c_str(), j.second.c_str());
+            Log::Write("%s\n", printFilenameWithBorder(flaIniPath.substr(flaIniPath.find_last_of("/\\") + 1), '#').c_str());
+            for (auto& i : flaIni.data)
+            {
+                Log::Write("[%s]\n", i.first.c_str());
+                for (auto& j : i.second)
+                    Log::Write("%s = %s\n\n", j.first.c_str(), j.second.c_str());
+            }
         }
     }
 
@@ -564,11 +566,12 @@ char __fastcall InteriorManager_c__UpdateHooked(void* _this)
 template <std::uintptr_t address>
 void __cdecl RetryLoadFileHooked(int streamNum)
 {
-    Log::Write("RetryLoadFile called for the following IDs in channel %d: ", streamNum);
-
-    for (int i = 0; i < 16; i++)
-        Log::Write("%d ", *reinterpret_cast<int*>(0x8E4A60 + streamNum * 0x98 + i * sizeof(int)));
-    Log::Write("\n");
+    if (Log::Write("RetryLoadFile called for the following IDs in channel %d: ", streamNum))
+    {
+        for (int i = 0; i < 16; i++)
+            Log::Write("%d ", *reinterpret_cast<int*>(0x8E4A60 + streamNum * 0x98 + i * sizeof(int)));
+        Log::Write("\n");
+    }
 
     callOriginal<address>(streamNum);
 }
