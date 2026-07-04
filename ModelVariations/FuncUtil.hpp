@@ -15,14 +15,6 @@
 #include <ntstatus.h>
 
 
-
-
-
-
-
-
-
-
 inline bool isGameHOODLUM()
 {
     return (plugin::GetGameVersion() == GAME_10US_HOODLUM);

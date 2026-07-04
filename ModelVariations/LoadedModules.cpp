@@ -18,9 +18,6 @@ static std::string hashFile(const std::string& filename)
     if (hFile == INVALID_HANDLE_VALUE)
         return "";
 
-    if (hFile == INVALID_HANDLE_VALUE)
-        return "";
-
     static constexpr char hex[] = "0123456789abcdef";
     std::string hashString;
     auto filesize = GetFileSize(hFile, NULL);

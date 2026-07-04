@@ -33,7 +33,7 @@
 #pragma comment (lib, "urlmon.lib")
 
 
-#define MOD_VERSION "10.8"
+#define MOD_VERSION "10.9"
 //Using Plugin-SDK: 34ba198
 
 struct jumpInfo {
@@ -76,7 +76,6 @@ bool transitioning = false;
 bool jumpsLogged = false;
 
 bool keyDown = false;
-bool queuedReload = false;
 
 std::atomic<bool> checkingForUpdates(false);
 std::atomic<bool> newVersionFound(false);

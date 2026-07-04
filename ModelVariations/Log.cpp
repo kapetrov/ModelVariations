@@ -4,11 +4,8 @@
 #include <cstdarg>
 #include <mutex>
 #include <set>
-#include <vector>
 
 #include <Windows.h>
-
-constexpr auto logBufferSize = 10000;
 
 HANDLE logfile = INVALID_HANDLE_VALUE;
 std::set<std::uintptr_t> modifiedAddresses;
