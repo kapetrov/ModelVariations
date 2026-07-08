@@ -162,7 +162,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 		}
 		else if (parseType == READ_TUNING)
 		{
-			if (strcasecmp(token, "paintjob"))
+			if (strcasestr(token, "paintjob"))
 			{
 				int paintjob = 0;
 				if (fromString<int>(token + 8, paintjob) && paintjob > 0)
