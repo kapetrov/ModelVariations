@@ -117,153 +117,22 @@ bool rand()
 inline std::string mvsprintf(const char* fmt, va_list ap)
 {
     if (!fmt) return {};
-    std::string out;
 
-    auto utoa = [](unsigned long long v, unsigned base, bool upper) {
-        const char* d = upper ? "0123456789ABCDEF" : "0123456789abcdef";
-        std::string s;
-        do {
-            s.insert(s.begin(), d[v % base]);
-            v /= base;
-        } while (v);
-        return s;
-    };
+    char buf[256];
 
-    auto int_prec = [](std::string s, int p) {
-        if (p < 0) return s;
-        bool neg = !s.empty() && s[0] == '-';
-        int digits = (int)s.size() - neg;
-        if (digits < p) s.insert(neg ? 1 : 0, p - digits, '0');
-        return s;
-    };
+    va_list copy;
+    va_copy(copy, ap);
+    int n = std::vsnprintf(buf, sizeof buf, fmt, copy);
+    va_end(copy);
 
-    auto width_pad = [](std::string s, int w, bool zero, bool numeric) {
-        if (w <= (int)s.size()) return s;
-        int n = w - (int)s.size();
+    if (n < 0) return {};
 
-        if (zero && numeric && !s.empty() && s[0] == '-')
-            return "-" + std::string(n, '0') + s.substr(1);
+    if ((size_t)n < sizeof buf)
+        return std::string(buf, n);
 
-        return std::string(n, zero && numeric ? '0' : ' ') + s;
-    };
-
-    for (; *fmt; ++fmt) {
-        if (*fmt != '%') {
-            out += *fmt;
-            continue;
-        }
-
-        ++fmt;
-        if (!*fmt) {
-            out += '%';
-            break;
-        }
-        if (*fmt == '%') {
-            out += '%';
-            continue;
-        }
-
-        bool zero = false;
-        if (*fmt == '0') {
-            zero = true;
-            ++fmt;
-        }
-
-        int width = 0;
-        while (*fmt >= '0' && *fmt <= '9') {
-            width = width * 10 + (*fmt - '0');
-            ++fmt;
-        }
-
-        int prec = -1;
-        if (*fmt == '.') {
-            prec = 0;
-            ++fmt;
-            while (*fmt >= '0' && *fmt <= '9') {
-                prec = prec * 10 + (*fmt - '0');
-                ++fmt;
-            }
-        }
-
-        std::string s;
-
-        switch (*fmt) {
-        case 'd': {
-            long long v = va_arg(ap, int);
-            bool neg = v < 0;
-            unsigned long long u = neg ? (unsigned long long)(-v) : (unsigned long long)v;
-            s = prec == 0 && u == 0 ? "" : utoa(u, 10, false);
-            if (neg) s.insert(s.begin(), '-');
-            s = int_prec(s, prec);
-            out += width_pad(s, width, zero && prec < 0, true);
-            break;
-        }
-
-        case 'u': {
-            unsigned v = va_arg(ap, unsigned);
-            s = prec == 0 && v == 0 ? "" : utoa(v, 10, false);
-            s = int_prec(s, prec);
-            out += width_pad(s, width, zero && prec < 0, true);
-            break;
-        }
-
-        case 'x':
-        case 'X': {
-            unsigned v = va_arg(ap, unsigned);
-            s = prec == 0 && v == 0 ? "" : utoa(v, 16, *fmt == 'X');
-            s = int_prec(s, prec);
-            out += width_pad(s, width, zero && prec < 0, true);
-            break;
-        }
-
-        case 's': {
-            const char* p = va_arg(ap, const char*);
-            s = p ? p : "(null)";
-            if (prec >= 0 && prec < (int)s.size()) s.resize(prec);
-            out += width_pad(s, width, false, false);
-            break;
-        }
-
-        case 'c': {
-            s += char(va_arg(ap, int));
-            out += width_pad(s, width, false, false);
-            break;
-        }
-
-        case 'f': {
-            double v = va_arg(ap, double);
-            int p = prec >= 0 ? prec : 6;
-            if (p > 18) p = 18;
-
-            bool neg = v < 0;
-            if (neg) v = -v;
-
-            unsigned long long scale = 1;
-            for (int i = 0; i < p; ++i) scale *= 10;
-
-            unsigned long long all = (unsigned long long)(v * scale + 0.5);
-
-            s = utoa(all / scale, 10, false);
-
-            if (p > 0) {
-                std::string fs = utoa(all % scale, 10, false);
-                if ((int)fs.size() < p)
-                    fs.insert(0, p - fs.size(), '0');
-                s += "." + fs;
-            }
-
-            if (neg) s.insert(s.begin(), '-');
-
-            out += width_pad(s, width, zero, true);
-            break;
-        }
-
-        default:
-            out += '%';
-            out += *fmt;
-            break;
-        }
-    }
+    std::string out(n + 1, '\0');
+    std::vsnprintf(out.data(), out.size(), fmt, ap);
+    out.resize(n);
 
     return out;
 }

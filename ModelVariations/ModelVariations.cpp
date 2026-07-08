@@ -684,9 +684,9 @@ int __cdecl FileLoaderLoadObject(const char* a1)
 
         if (p)
         {
-            auto r = std::from_chars(a1, p, id);
+            std::string_view sv{ a1, static_cast<std::size_t>(p - a1) };
 
-            if (r.ec == std::errc{} && r.ptr == p && id > 0 && id < 65536)
+            if (fromString(sv, id) && id > 0 && id < 65536)
             {
                 while (*p == ' ') ++p;
 
@@ -1088,8 +1088,7 @@ public:
                 for (const auto& s : splitString(checkForceEnabled, ','))
                 {
                     std::uintptr_t value;
-                    auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), value, 16);
-                    if (ec == std::errc{} && ptr == (s.data() + s.size()))
+                    if (fromString<std::uintptr_t>(s, value, 16))
                         forceEnable.insert(value);
                 }
             }
