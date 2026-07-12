@@ -30,11 +30,6 @@ inline CVector2D convert3DVectorTo2D(const CVector& vec)
     return { vec.x, vec.y };
 }
 
-inline void printMessage(const char* message, unsigned int time)
-{
-    CMessages::AddMessageJumpQ(const_cast<char*>(message), time, 0, false);
-}
-
 inline std::string getFullPath(const std::string& filename)
 {
     return filename.find(':') != std::string::npos ? filename : (LoadedModules::GetSelfDirectory() + '\\' + filename);

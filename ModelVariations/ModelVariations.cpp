@@ -838,7 +838,7 @@ void __cdecl CGame__ProcessHooked()
 
     if (newVersionFound && gameplayTimeSinceLoad.count() > 9999)
     {
-        printMessage("~y~Model Variations~s~: Update available.", 4000);
+        CMessages::AddMessageJumpQ("~y~Model Variations~s~: Update available.", 4000, 0, false);
         newVersionFound = false;
     }
 
@@ -847,7 +847,7 @@ void __cdecl CGame__ProcessHooked()
         if (!keyDown)
         {
             keyDown = true;
-            printMessage("~y~Model Variations~s~: Mod disabled.", 2000);
+            CMessages::AddMessageJumpQ("~y~Model Variations~s~: Mod disabled.", 2000, 0, false);
             Log::Write("Disabling mod... ");
             clearEverything();
             Log::Write("OK\n");
@@ -860,11 +860,11 @@ void __cdecl CGame__ProcessHooked()
             keyDown = true;
             Log::Write("Reloading settings...\n");
             clearEverything();
-            printMessage("~y~Model Variations~s~: Reloading settings...", 10000);
+            CMessages::AddMessageJumpQ("~y~Model Variations~s~: Reloading settings...", 10000, 0, false);
             loadIniData();
 
             *reinterpret_cast<uint64_t*>(currentZone) = 0;
-            printMessage("~y~Model Variations~s~: Settings reloaded.", 2000);
+            CMessages::AddMessageJumpQ("~y~Model Variations~s~: Settings reloaded.", 2000, 0, false);
         }
     }
     else if (debugKey > 0 && (GetKeyState(debugKey) & 0x8000) != 0)

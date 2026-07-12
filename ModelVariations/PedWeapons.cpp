@@ -63,7 +63,9 @@ void PedWeaponVariations::ClearData()
 {
     wepPedModels.clear();
     wepVehModels.clear();
+    pedWepStack = {};
     pedHasWeaponVariations.clear();
+    delayedPeds.clear();
     iniHasGlobal = false;
 
     pedWeaponOptions = {};

@@ -169,7 +169,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 					for (int i = 0; i < multiplier; i++)
 						retVector.push_back((unsigned short)paintjob-1U);
 			}
-			else if (token[0] != 'G')
+			else
 			{
 				auto mInfo = CModelInfo::GetModelInfo(token, &modelid);
 				if (mInfo != NULL)
