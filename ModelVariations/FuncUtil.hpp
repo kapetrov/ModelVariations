@@ -194,9 +194,13 @@ inline std::string fileToString(const std::string &filename)
 
     str.resize(filesize);
     DWORD lpNumberOfBytesRead = 0;
-    ReadFile(hFile, &str[0], filesize, &lpNumberOfBytesRead, NULL);
+    auto success = ReadFile(hFile, &str[0], filesize, &lpNumberOfBytesRead, NULL);
 
     CloseHandle(hFile);
+
+    if (!success)
+        return "";
+
     return str;
 }
 
@@ -223,8 +227,11 @@ inline bool strcasestr(std::string src, std::string sub)
 
 inline bool strcasecmp(std::string_view s1, std::string_view s2)
 {
-    if (s1.empty())
-        return s2.empty();
+    while (!s1.empty() && s1.back() == '\0')
+        s1.remove_suffix(1);
+
+    while (!s2.empty() && s2.back() == '\0')
+        s2.remove_suffix(1);
 
     if (s1.size() != s2.size())
         return false;

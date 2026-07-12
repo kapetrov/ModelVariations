@@ -85,7 +85,10 @@ const std::pair<std::string, MODULEINFO>& LoadedModules::GetExeModule()
         return exeModule;
 
     std::string exeName(256, 0);
-    GetModuleFileName(NULL, &exeName[0], 255);
+    DWORD length = GetModuleFileName(NULL, &exeName[0], 255);
+    if (length == 0 || length >= 256)
+        return exeModule;
+    exeName.resize(length);
     exeName = getFilenameFromPath(exeName);
 
     exeModule = GetModule(exeName);

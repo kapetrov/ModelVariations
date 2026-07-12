@@ -609,9 +609,9 @@ template <std::uintptr_t address>
 void CPopCycle__DisplayHooked()
 {
     if (drawDebugText > 2 && debugDrawVehicles > 0)
-        VehicleVariations::DrawDebugInfo(debugDrawSize, debugDrawPeds);
+        VehicleVariations::DrawDebugInfo(debugDrawSize, debugDrawVehicles);
     if ((drawDebugText == 2 || drawDebugText == 4) && debugDrawPeds > 0)
-        PedVariations::DrawDebugInfo(debugDrawSize, debugDrawVehicles);
+        PedVariations::DrawDebugInfo(debugDrawSize, debugDrawPeds);
 
     if (drawDebugText > 0)
     {
@@ -1087,12 +1087,12 @@ public:
         {
             if (checkForceEnabled == "1" || strcasecmp(checkForceEnabled, "true"))
                 forceEnableGlobal = true;
-            else if (checkForceEnabled != "0" && isdigit(checkForceEnabled[0]))
+            else if (checkForceEnabled != "0")
             {
                 for (const auto& s : splitString(checkForceEnabled, ','))
                 {
                     std::uintptr_t value;
-                    if (fromString<std::uintptr_t>(s, value, 16))
+                    if (fromString<std::uintptr_t>(trimString(s), value, 16))
                         forceEnable.insert(value);
                 }
             }
