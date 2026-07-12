@@ -514,7 +514,7 @@ void PedVariations::UpdateVariations()
     }
 }
 
-void PedVariations::DrawDebugInfo(float fontSize)
+void PedVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
 {
     auto* pedPool = CPools::ms_pPedPool;
     if (!pedPool)
@@ -539,7 +539,7 @@ void PedVariations::DrawDebugInfo(float fontSize)
         if (!IsPedPointerValid(ped) || ped->m_nModelIndex < 7 || !ped->IsAlive() || !isPedVisible(ped))
             continue;
 
-        // Position a little above the vehicle
+        // Position a little above the ped
         CVector pos = ped->GetPosition();
 
         RwV3d worldPos;
@@ -553,24 +553,40 @@ void PedVariations::DrawDebugInfo(float fontSize)
             continue;
 
         const float lineOffset = (RsGlobal.maximumHeight / 640.0f) * fontSize * 35.0f;
-        std::string line1 = msprintf("0x%08X", reinterpret_cast<std::uintptr_t>(ped));
-        std::string line2 = msprintf("%u %s", ped->m_nModelIndex, modelNames.contains(ped->m_nModelIndex) ? modelNames[ped->m_nModelIndex].c_str() : "");
-        
-        CFont::PrintString(screenPos.x, screenPos.y, line1.c_str());
-        CFont::PrintString(screenPos.x, screenPos.y + lineOffset, line2.c_str());
+        float currentOffset = lineOffset;
 
-        std::string nextLine;
-       
-        if (auto it = pedVars.originalModels.find(ped->m_nModelIndex); it != pedVars.originalModels.end())
+        if (debugOptions & std::to_underlying(debugDrawPedStats::POINTER))
         {
-            nextLine = "Parent model: " + std::to_string(it->second);
-            CFont::PrintString(screenPos.x, screenPos.y + lineOffset * 2.0f, nextLine.c_str());
+            std::string line = msprintf("0x%08X", reinterpret_cast<std::uintptr_t>(ped));
+            CFont::PrintString(screenPos.x, screenPos.y, line.c_str());
         }
 
-        if (auto it = changedVoices.find(ped); it != changedVoices.end())
+        if (debugOptions & std::to_underlying(debugDrawPedStats::MODEL))
+        {
+            std::string line = msprintf("%u %s", ped->m_nModelIndex, modelNames.contains(ped->m_nModelIndex) ? modelNames[ped->m_nModelIndex].c_str() : "");
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawPedStats::HEALTH))
+        {
+            std::string line = msprintf("Health: %.0f/%.0f", ped->m_fHealth, ped->m_fMaxHealth);
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+       
+        if (auto it = pedVars.originalModels.find(ped->m_nModelIndex); (debugOptions & std::to_underlying(debugDrawPedStats::MODEL)) && it != pedVars.originalModels.end())
+        {
+            std::string line = "Parent model: " + std::to_string(it->second);
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+
+        if (auto it = changedVoices.find(ped); (debugOptions & std::to_underlying(debugDrawPedStats::VOICE)) && it != changedVoices.end())
         {
             std::string buffer = msprintf("Voice: %u", it->second);
-            CFont::PrintString(screenPos.x, screenPos.y + lineOffset * 3.0f, buffer.c_str());
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, buffer.c_str());
+            currentOffset += lineOffset;
         }
     }
 }

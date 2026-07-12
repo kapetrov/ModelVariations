@@ -1237,7 +1237,7 @@ void VehicleVariations::UpdateVariations()
         }
 }
 
-void VehicleVariations::DrawDebugInfo(float fontSize)
+void VehicleVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
 {
     auto* vehiclePool = CPools::ms_pVehiclePool;
     if (!vehiclePool)
@@ -1275,21 +1275,34 @@ void VehicleVariations::DrawDebugInfo(float fontSize)
         if (!CSprite::CalcScreenCoors(worldPos, &screenPos, &w, &h, true, true))
             continue;
 
-        float lineOffset = (RsGlobal.maximumHeight / 640.0f) * fontSize * 35.0f;
-        std::string line1 = msprintf("0x%08X", reinterpret_cast<std::uintptr_t>(veh));
-        std::string line2 = msprintf("%u %s", veh->m_nModelIndex, modelNames.contains(veh->m_nModelIndex) ? modelNames[veh->m_nModelIndex].c_str() : "");       
+        const float lineOffset = (RsGlobal.maximumHeight / 640.0f) * fontSize * 35.0f;
+        float currentOffset = lineOffset;
 
-        CFont::PrintString(screenPos.x, screenPos.y, line1.c_str());
-        CFont::PrintString(screenPos.x, screenPos.y + lineOffset, line2.c_str());
-        lineOffset += lineOffset;
-
-        
-        auto parentModel = getVariationOriginalModel(veh->m_nModelIndex);
-        if (parentModel != veh->m_nModelIndex)
+        if (debugOptions & std::to_underlying(debugDrawVehStats::POINTER))
         {
-            std::string nextline = msprintf("Parent model : %d", parentModel);
-            CFont::PrintString(screenPos.x, screenPos.y + lineOffset, nextline.c_str());
-            lineOffset += lineOffset;
+            std::string line = msprintf("0x%08X", reinterpret_cast<std::uintptr_t>(veh));
+            CFont::PrintString(screenPos.x, screenPos.y, line.c_str());
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawVehStats::MODEL))
+        {
+            std::string line = msprintf("%u %s", veh->m_nModelIndex, modelNames.contains(veh->m_nModelIndex) ? modelNames[veh->m_nModelIndex].c_str() : "");
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        } 
+
+        if (debugOptions & std::to_underlying(debugDrawVehStats::HEALTH))
+        {
+            std::string line = msprintf("Health: %.0f", veh->m_fHealth);
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+
+        if (auto parentModel = getVariationOriginalModel(veh->m_nModelIndex); parentModel != veh->m_nModelIndex && (debugOptions & std::to_underlying(debugDrawVehStats::PARENT_MODEL)))
+        {
+            std::string line = msprintf("Parent model : %d", parentModel);
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
         }
     }
 }

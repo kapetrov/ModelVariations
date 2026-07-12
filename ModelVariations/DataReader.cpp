@@ -69,6 +69,16 @@ int DataReader::ReadInteger(const std::string &section, const std::string &key, 
 	return value;
 }
 
+unsigned int DataReader::ReadHex(const std::string& section, const std::string& key, unsigned int defaultValue)
+{
+	unsigned value = defaultValue;
+	if (auto itSection = data.find(section); itSection != data.end())
+		if (auto itKey = itSection->second.find(key); itKey != itSection->second.end() && itKey->second.rfind("0x", 0) == 0)
+			fromString<unsigned int>(itKey->second.substr(2), value, 16);
+
+	return value;
+}
+
 float DataReader::ReadFloat(const std::string& section, const std::string& key, float defaultValue)
 {
 	float value = defaultValue;

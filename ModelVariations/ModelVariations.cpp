@@ -101,6 +101,8 @@ int debugKey = 0;
 float debugDrawSize = 0.28f;
 float debugDrawX = 20.0f;
 float debugDrawY = 340.0f;
+uint32_t debugDrawPeds = 0xFFFFFFFF;
+uint32_t debugDrawVehicles = 0xFFFFFFFF;
 
 std::set<std::uintptr_t> forceEnable;
 
@@ -606,10 +608,10 @@ char __fastcall TransitionFinishedHooked(CEntryExit* _this, void*, CPed* ped)
 template <std::uintptr_t address>
 void CPopCycle__DisplayHooked()
 {
-    if (drawDebugText > 2)
-        VehicleVariations::DrawDebugInfo(debugDrawSize);
-    if ((drawDebugText == 2 || drawDebugText == 4))
-        PedVariations::DrawDebugInfo(debugDrawSize);
+    if (drawDebugText > 2 && debugDrawVehicles > 0)
+        VehicleVariations::DrawDebugInfo(debugDrawSize, debugDrawPeds);
+    if ((drawDebugText == 2 || drawDebugText == 4) && debugDrawPeds > 0)
+        PedVariations::DrawDebugInfo(debugDrawSize, debugDrawVehicles);
 
     if (drawDebugText > 0)
     {
@@ -1077,6 +1079,8 @@ public:
         debugDrawSize = iniSettings.ReadFloat("Settings", "DebugDrawSize", 0.28f);
         debugDrawX = iniSettings.ReadFloat("Settings", "DebugDrawX", 20.0f);
         debugDrawY = iniSettings.ReadFloat("Settings", "DebugDrawY", 340.0f);
+        debugDrawPeds = iniSettings.ReadHex("Settings", "DebugDrawPeds", 0);
+        debugDrawVehicles = iniSettings.ReadHex("Settings", "DebugDrawVehicles", 0);
 
         std::string checkForceEnabled = iniSettings.ReadString("Settings", "ForceEnable", "");
         if (!checkForceEnabled.empty())

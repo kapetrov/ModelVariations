@@ -11,6 +11,15 @@ extern std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 extern int maxPedID;
 extern char currentZone[9];
 
+enum class debugDrawPedStats : uint32_t
+{
+	POINTER = 1,
+	MODEL = 2,
+	HEALTH = 4,
+	PARENT_MODEL = 8,
+	VOICE = 16
+};
+
 struct pedTimeGroup {
 	unsigned short start = 0;
 	unsigned short end = 0;
@@ -25,7 +34,7 @@ public:
 	static void Process();
 	static void ProcessDrugDealers(bool reset = false);
 	static void UpdateVariations();
-	static void DrawDebugInfo(float fontSize);
+	static void DrawDebugInfo(float fontSize, uint32_t debugOptions);
 
 	//Logging
 	static void LogCurrentVariations();

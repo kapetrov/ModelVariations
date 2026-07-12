@@ -29,6 +29,7 @@ public:
 	void Load(const char* filename);
 
 	int ReadInteger(const std::string& section, const std::string& key, int defaultValue);
+	unsigned int ReadHex(const std::string& section, const std::string& key, unsigned int defaultValue);
 	float ReadFloat(const std::string& section, const std::string& key, float defaultValue);
 	bool ReadBoolean(const std::string& section, const std::string& key, bool defaultValue);
 	std::string ReadString(const std::string& section, const std::string& key, const std::string &defaultValue);
