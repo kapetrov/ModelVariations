@@ -91,6 +91,7 @@ bool enableVehicles = false;
 bool enablePedWeapons = false;
 bool forceEnableGlobal = false;
 bool enableStreamingFix = false;
+int lowMemoryProtection = 3300;
 int loadStage = 1;
 int trackReferenceCounts = -1;
 int disableKey = 0;
@@ -755,6 +756,18 @@ void __cdecl RemoveTrianglePlanesHooked(CCollisionData* a2)
 template <std::uintptr_t address>
 void __cdecl CGame__ProcessHooked()
 {
+    int totalMemory = getMemoryUsage() / 1024 / 1024;
+
+    if (lowMemoryProtection > 0 && totalMemory > lowMemoryProtection && (enablePeds || enablePedWeapons || enableVehicles))
+    {
+        CMessages::AddMessageJumpQ("~y~Model Variations~s~: Mod disabled due to low memory. Reload manually.", 4000, 0, false);
+        reinterpret_cast<void (*)()>(0x40CF80)(); //CStreaming::RemoveAllUnusedModels
+        clearEverything();
+        enablePeds = false;
+        enablePedWeapons = false;
+        enableVehicles = false;
+    }
+
     if (!FrontEndMenuManager->m_bMenuActive)
     {
         auto now = std::chrono::steady_clock::now();
@@ -1070,6 +1083,7 @@ public:
 
         trackReferenceCounts = iniSettings.ReadInteger("Settings", "TrackReferenceCounts", -1);
         enableStreamingFix = iniSettings.ReadBoolean("Settings", "EnableStreamingFix", false);
+        lowMemoryProtection = iniSettings.ReadInteger("Settings", "LowMemoryProtection", 0);
         loadStage = iniSettings.ReadInteger("Settings", "LoadStage", 1);
         disableKey = iniSettings.ReadInteger("Settings", "DisableKey", 0);
         reloadKey = iniSettings.ReadInteger("Settings", "ReloadKey", 0);
