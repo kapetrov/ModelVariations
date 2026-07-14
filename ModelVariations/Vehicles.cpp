@@ -139,6 +139,7 @@ struct tVehVars {
     std::unordered_map<unsigned short, RwRGBA> lightColors2;
     std::unordered_map<unsigned short, float> lightSizes;
     std::unordered_map<unsigned short, std::vector<unsigned short>> *currentTuning = nullptr;
+    std::unordered_map<unsigned short, std::vector<unsigned short>> tuningDriverIds;
     std::unordered_map<unsigned short, std::string> vehModels;
     std::unordered_map<unsigned short, BYTE> tuningChances;
     std::unordered_map<unsigned short, BYTE> trailersSpawnChances;
@@ -907,6 +908,10 @@ void VehicleVariations::LoadData()
             if (!vec.empty())
                 vehVars.trailersMatchColors[modelid] = vec;
 
+            vec = dataFile.ReadLine(section, "TuningDriverIDs", READ_PEDS);
+            if (!vec.empty())
+                vehVars.tuningDriverIds[modelid] = vec;
+
             const int trailersSpawnChance = dataFile.ReadInteger(section, "TrailersSpawnChance", -1);
             if (trailersSpawnChance > -1)
                 vehVars.trailersSpawnChances.insert({ modelid, (BYTE)(trailersSpawnChance > 100 ? 100 : trailersSpawnChance) });
@@ -1045,8 +1050,12 @@ void VehicleVariations::Process()
     while (!vehVars.tuningStack.empty())
     {
         const auto &it = vehVars.tuningStack.top();
+        vehVars.tuningStack.pop();
+        if (!IsVehiclePointerValid(it.first))
+            continue;
 
-        if (IsVehiclePointerValid(it.first))
+        auto itDrivers = vehVars.tuningDriverIds.find(it.first->m_nModelIndex);
+        if (itDrivers == vehVars.tuningDriverIds.end() || vectorHasId(itDrivers->second, it.first->m_pDriver == NULL ? 0 : it.first->m_pDriver->m_nModelIndex))
             for (int selectedPart : it.second)
                 if (selectedPart > -1)
                 {
@@ -1079,8 +1088,6 @@ void VehicleVariations::Process()
                         }
                     }
                 }
-
-        vehVars.tuningStack.pop();
     }
 
     while (!vehVars.stack.empty())
