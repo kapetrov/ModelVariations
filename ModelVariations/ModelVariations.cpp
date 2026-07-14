@@ -662,7 +662,7 @@ void CPopCycle__DisplayHooked()
 
         PrintDebugLine("Current zone: %s", currentZone);
         if (player && player->m_pEnex)
-            PrintDebugLine("Current interior: %s", player->m_pEnex);
+            PrintDebugLine("Current interior: %.8s", player->m_pEnex);
         if (CWeather::Rain > 0.001)
             PrintDebugLine("%s: %.3f", isRainy ? "~y~Rain~s~" : "Rain", CWeather::Rain);
         if (CWeather::Sandstorm > 0.001)

@@ -596,6 +596,9 @@ void VehicleVariations::ClearData()
     vehVars = {};
     vehOptions = {};
 
+    for (std::size_t i = 0; i < vehVars.originalModels.size(); ++i)
+        vehVars.originalModels[i] = static_cast<unsigned short>(i);
+
     dataFile.data.clear();
 }
 
@@ -813,11 +816,11 @@ void VehicleVariations::LoadData()
             for (int j = 0; j < 9; j++)
             {
                 auto vec = dataFile.ReadTrailerLine(section, "Trailers" + std::to_string(j + 1));
-                if (!vec.empty())
-                {
-                    vehVars.trailers[j].insert({ modelid, vec });
-                    trailersNum++;
-                }                    
+                if (vec.empty())
+                    break;
+ 
+                vehVars.trailers[j].insert({ modelid, vec });
+                trailersNum++;                   
             }
 
             for (auto& zoneEntry : vehVars.trailerZones)
@@ -1490,10 +1493,11 @@ void __fastcall DoInternalProcessingHooked(CCarGenerator* park) //for non-random
     if (park == NULL)
         return;
 
-    if (park->m_nModelId < 0)
+    if (park->m_nModelId < 0) //We're tuning only random cars
     {
-        callMethodOriginal<address>(park);
         tuneParkedCar = true;
+        callMethodOriginal<address>(park);
+        tuneParkedCar = false;
         return;
     }
 
