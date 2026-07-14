@@ -15,8 +15,11 @@ enum class debugDrawVehStats
 {
 	POINTER = 1,
 	MODEL = 2,
-	HEALTH = 4,
-	PARENT_MODEL = 8,
+	CREATED_BY = 4,
+	LOCKED = 8,
+	PROOFS = 16,
+	HEALTH = 32,
+	PARENT_MODEL = 64,
 };
 
 struct vehTimeGroup {

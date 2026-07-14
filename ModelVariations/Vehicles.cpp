@@ -1289,7 +1289,46 @@ void VehicleVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
             std::string line = msprintf("%u %s", veh->m_nModelIndex, modelNames.contains(veh->m_nModelIndex) ? modelNames[veh->m_nModelIndex].c_str() : "");
             CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
             currentOffset += lineOffset;
-        } 
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawVehStats::CREATED_BY))
+        {
+            std::string line;
+            if (veh->m_nCreatedBy == 1)
+                line = "RANDOM_VEHICLE";
+            else if (veh->m_nCreatedBy == 2)
+                line = "MISSION_VEHICLE";
+            else if (veh->m_nCreatedBy == 3)
+                line = "PARKED_VEHICLE";
+            else if (veh->m_nCreatedBy == 4)
+                line = "PERMANENT_VEHICLE";
+
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawVehStats::LOCKED) && !veh->CanPedOpenLocks(FindPlayerPed()))
+        {
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, "Locked");
+            currentOffset += lineOffset;
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawVehStats::PROOFS))
+        {
+            std::string proofs = msprintf("%s%s%s%s%s%s", veh->bBulletProof ? " BP" : "",
+                                                          veh->bFireProof ? " FP" : "",
+                                                          veh->bCollisionProof ? " CP" : "",
+                                                          veh->bMeleeProof ? " MP" : "",
+                                                          veh->bExplosionProof ? " EP" : "",
+                                                          veh->bInvulnerable ? " WP" : "");
+
+            if (!proofs.empty())
+            {
+                std::string line = msprintf("Proofs:%s", proofs.c_str());
+                CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+                currentOffset += lineOffset;
+            }
+        }
 
         if (debugOptions & std::to_underlying(debugDrawVehStats::HEALTH))
         {

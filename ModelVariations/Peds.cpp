@@ -568,9 +568,48 @@ void PedVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
             currentOffset += lineOffset;
         }
 
+        if (debugOptions & std::to_underlying(debugDrawPedStats::CREATED_BY))
+        {
+            std::string line;
+            if (ped->m_nCreatedBy == 0)
+                line = "PED_UNKNOWN";
+            else if (ped->m_nCreatedBy == 1)
+                line = "PED_GAME";
+            else if (ped->m_nCreatedBy == 2)
+                line = "PED_MISSION";
+            else if (ped->m_nCreatedBy == 3)
+                line = "PED_GAME_MISSION";
+
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawPedStats::PROOFS))
+        {
+            std::string proofs = msprintf("%s%s%s%s%s%s", ped->bBulletProof ? " BP" : "",
+                                                          ped->bFireProof ? " FP" : "",
+                                                          ped->bCollisionProof ? " CP" : "",
+                                                          ped->bMeleeProof ? " MP" : "",
+                                                          ped->bExplosionProof ? " EP" : "",
+                                                          ped->bInvulnerable ? " WP" : "");
+            if (!proofs.empty())
+            {
+                std::string line = msprintf("Proofs:%s", proofs.c_str());
+                CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+                currentOffset += lineOffset;
+            }
+        }
+
         if (debugOptions & std::to_underlying(debugDrawPedStats::HEALTH))
         {
             std::string line = msprintf("Health: %.0f/%.0f", ped->m_fHealth, ped->m_fMaxHealth);
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawPedStats::ARMOUR) && ped->m_fArmour > 0.0f)
+        {
+            std::string line = msprintf("Armour: %.0f", ped->m_fArmour);
             CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
             currentOffset += lineOffset;
         }
