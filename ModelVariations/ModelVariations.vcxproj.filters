@@ -10,6 +10,7 @@
     <ClCompile Include="LoadedModules.cpp" />
     <ClCompile Include="Hooks.cpp" />
     <ClCompile Include="Memory.cpp" />
+    <ClCompile Include="Helpers.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Vehicles.hpp" />
@@ -18,7 +19,7 @@
     <ClInclude Include="Peds.hpp" />
     <ClInclude Include="PedWeapons.hpp" />
     <ClInclude Include="Log.hpp" />
-    <ClInclude Include="FuncUtil.hpp" />
+    <ClInclude Include="Helpers.hpp" />
     <ClInclude Include="LoadedModules.hpp" />
     <ClInclude Include="SA.hpp" />
     <ClInclude Include="Memory.hpp" />

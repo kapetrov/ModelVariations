@@ -109,6 +109,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DataReader.cpp" />
+    <ClCompile Include="Helpers.cpp" />
     <ClCompile Include="Hooks.cpp" />
     <ClCompile Include="LoadedModules.cpp" />
     <ClCompile Include="Log.cpp" />
@@ -120,7 +121,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DataReader.hpp" />
-    <ClInclude Include="FuncUtil.hpp" />
+    <ClInclude Include="Helpers.hpp" />
     <ClInclude Include="LoadedModules.hpp" />
     <ClInclude Include="Log.hpp" />
     <ClInclude Include="Hooks.hpp" />

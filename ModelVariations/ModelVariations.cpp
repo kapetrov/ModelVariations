@@ -1,5 +1,5 @@
 #include "DataReader.hpp"
-#include "FuncUtil.hpp"
+#include "Helpers.hpp"
 #include "Hooks.hpp"
 #include "LoadedModules.hpp"
 #include "Log.hpp"
@@ -15,6 +15,7 @@
 #include <CEntryExitManager.h>
 #include <CFont.h>
 #include <CLoadedCarGroup.h>
+#include <CMessages.h>
 #include <CModelInfo.h>
 #include <CRunningScript.h>
 #include <CStreaming.h>

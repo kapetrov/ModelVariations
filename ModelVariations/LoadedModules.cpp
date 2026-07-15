@@ -1,9 +1,11 @@
 #include "LoadedModules.hpp"
 
-#include "FuncUtil.hpp"
+#include "Helpers.hpp"
 #include "Log.hpp"
 
 #include <map>
+
+#include <ntstatus.h>
 
 std::map<loadedModNames, bool> loadedMods;
 std::vector<std::pair<std::string, MODULEINFO>> loadedModules;

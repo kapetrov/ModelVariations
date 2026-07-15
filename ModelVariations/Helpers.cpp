@@ -1,65 +1,60 @@
-#pragma once
+#include "Helpers.hpp"
 
-#include "LoadedModules.hpp"
 
 #include <algorithm>
 #include <iterator>
-#include <charconv>
-#include <type_traits>
 #include <utility>
-#include <vector>
 
-#include <CGeneral.h>
 #include <CMessages.h>
 
 #include <ntstatus.h>
 
 
-inline bool isGameHOODLUM()
+bool isGameHOODLUM()
 {
     return (plugin::GetGameVersion() == GAME_10US_HOODLUM);
 }
 
-inline bool isGameCompact()
+bool isGameCompact()
 {
     return (plugin::GetGameVersion() == GAME_10US_COMPACT);
 }
 
-inline CVector2D convert3DVectorTo2D(const CVector& vec)
+CVector2D convert3DVectorTo2D(const CVector& vec)
 {
     return { vec.x, vec.y };
 }
 
-inline std::string getFullPath(const std::string& filename)
+std::string getFullPath(const std::string& filename)
 {
     return filename.find(':') != std::string::npos ? filename : (LoadedModules::GetSelfDirectory() + '\\' + filename);
 }
 
-inline std::string printFilenameWithBorder(const std::string &name, const char ch = '#') 
+std::string printFilenameWithBorder(const std::string& name, const char ch)
 {
     std::string outString;
     size_t line_width = name.size() + 6; // "## " + name + " ##"
 
 
-    for (size_t i = 0;i<line_width;i++)
+    for (size_t i = 0; i < line_width; i++)
         outString += ch;
 
     outString += "\n";
     outString += std::string(2, ch) + " " + name + " " + std::string(2, ch);
     outString += "\n";
 
-    for (size_t i = 0;i<line_width;i++)
+    for (size_t i = 0; i < line_width; i++)
         outString += ch;
 
     return outString;
 }
 
-inline bool fileExists(const std::string& filename)
+bool fileExists(const std::string& filename)
 {
     return GetFileAttributes(getFullPath(filename).c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
-inline bool isTimeInRange(int timeNow, int timeStart, int timeEnd)
+bool isTimeInRange(int timeNow, int timeStart, int timeEnd)
 {
     if (timeStart <= timeEnd) // Normal range (same day)
         return timeNow >= timeStart && timeNow <= timeEnd;
@@ -67,7 +62,7 @@ inline bool isTimeInRange(int timeNow, int timeStart, int timeEnd)
     return timeNow >= timeStart || timeNow <= timeEnd; // Wrap-around past midnight
 }
 
-inline std::string getDatetime(bool printDate, bool printTime, bool printMs)
+std::string getDatetime(bool printDate, bool printTime, bool printMs)
 {
     SYSTEMTIME s;
     GetSystemTime(&s);
@@ -77,39 +72,20 @@ inline std::string getDatetime(bool printDate, bool printTime, bool printMs)
     auto year = std::to_string(s.wYear);
 
     auto z = [](int n, int width)
-    {
-        std::string r = std::to_string(n);
-        return std::string(width - r.size(), '0') + r;
-    };
+        {
+            std::string r = std::to_string(n);
+            return std::string(width - r.size(), '0') + r;
+        };
 
     return (printDate ? day + "/" + month + "/" + year + (printTime ? " " : "") : "") +
-           (printTime ? z(s.wHour, 2) + ":" + z(s.wMinute, 2) + ":" + z(s.wSecond, 2) + (printMs ? "." + z(s.wMilliseconds, 3) : "") : "");
+        (printTime ? z(s.wHour, 2) + ":" + z(s.wMinute, 2) + ":" + z(s.wSecond, 2) + (printMs ? "." + z(s.wMilliseconds, 3) : "") : "");
 }
-
-////////////
-// Random //
-////////////
-
-template <typename T>
-T rand(int min, unsigned int max)
-{
-    return (T)CGeneral::GetRandomNumberInRange(min, (int)max);
-}
-
-template <typename T>
-bool rand()
-{
-    static_assert(std::is_same_v<T, bool>, "invalid type for template");
-
-    return (bool)CGeneral::GetRandomNumberInRange(0, 2);
-}
-
 
 /////////////
 // Strings //
 /////////////
 
-inline std::string mvsprintf(const char* fmt, va_list ap)
+std::string mvsprintf(const char* fmt, va_list ap)
 {
     if (!fmt) return {};
 
@@ -132,7 +108,7 @@ inline std::string mvsprintf(const char* fmt, va_list ap)
     return out;
 }
 
-inline std::string msprintf(const char* fmt, ...)
+std::string msprintf(const char* fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
@@ -141,7 +117,7 @@ inline std::string msprintf(const char* fmt, ...)
     return s;
 }
 
-inline char* copyString(char* dest, const char* src, size_t n) //Does not null-terminate
+char* copyString(char* dest, const char* src, size_t n) //Does not null-terminate
 {
     if (dest == nullptr || src == nullptr)
         return nullptr;
@@ -157,12 +133,12 @@ inline char* copyString(char* dest, const char* src, size_t n) //Does not null-t
     return dest;
 }
 
-inline char toUpper(char c)
+char toUpper(char c)
 {
     return (c >= 'a' && c <= 'z') ? c - 32 : c;
 }
 
-inline std::string bytesToString(std::uintptr_t address, unsigned int nBytes)
+std::string bytesToString(std::uintptr_t address, unsigned int nBytes)
 {
     const unsigned char* c = reinterpret_cast<unsigned char*>(address);
     std::string result;
@@ -177,7 +153,7 @@ inline std::string bytesToString(std::uintptr_t address, unsigned int nBytes)
     return result;
 }
 
-inline std::string fileToString(const std::string &filename)
+std::string fileToString(const std::string& filename)
 {
     std::string str;
 
@@ -204,20 +180,20 @@ inline std::string fileToString(const std::string &filename)
     return str;
 }
 
-inline std::string getFilenameFromPath(const std::string &path)
+std::string getFilenameFromPath(const std::string& path)
 {
     return path.substr(path.find_last_of("/\\") + 1);
 }
 
-inline bool strcasestr(std::string src, std::string sub)
+bool strcasestr(std::string src, std::string sub)
 {
     std::for_each(src.begin(), src.end(), [](char& c) {
         c = toUpper(c);
-    });
+        });
 
     std::for_each(sub.begin(), sub.end(), [](char& c) {
         c = toUpper(c);
-    });
+        });
 
     if (src.find(sub) != std::string::npos)
         return true;
@@ -225,7 +201,7 @@ inline bool strcasestr(std::string src, std::string sub)
     return false;
 }
 
-inline bool strcasecmp(std::string_view s1, std::string_view s2)
+bool strcasecmp(std::string_view s1, std::string_view s2)
 {
     while (!s1.empty() && s1.back() == '\0')
         s1.remove_suffix(1);
@@ -245,7 +221,7 @@ inline bool strcasecmp(std::string_view s1, std::string_view s2)
     return true;
 }
 
-inline std::vector<std::string> splitString(const std::string &s, char separator)
+std::vector<std::string> splitString(const std::string& s, char separator)
 {
     std::vector<std::string> out;
 
@@ -267,7 +243,7 @@ inline std::vector<std::string> splitString(const std::string &s, char separator
     return out;
 }
 
-inline std::vector<std::string> splitString(const std::string& s, const std::string& separators)
+std::vector<std::string> splitString(const std::string& s, const std::string& separators)
 {
     std::vector<std::string> out;
 
@@ -294,7 +270,7 @@ inline std::vector<std::string> splitString(const std::string& s, const std::str
     return out;
 }
 
-inline std::string trimString(const std::string& str) 
+std::string trimString(const std::string& str)
 {
     size_t first = str.find_first_not_of(" \t\n\r");
     size_t last = str.find_last_not_of(" \t\n\r");
@@ -305,36 +281,12 @@ inline std::string trimString(const std::string& str)
     return str.substr(first, (last - first + 1));
 }
 
-template <typename T>
-bool fromString(std::string_view str, T& x, int base = 10)
-{
-    T value{};
-
-    const char* first = str.data();
-    const char* last = str.data() + str.size();
-
-    std::from_chars_result result{};
-
-    if constexpr (std::is_integral_v<T>)
-        result = std::from_chars(first, last, value, base);
-    else if constexpr (std::is_floating_point_v<T>)
-        result = std::from_chars(first, last, value);
-    else
-        static_assert(std::is_arithmetic_v<T>, "fromString<T> only supports arithmetic types parseable by std::from_chars");
-
-    if (result.ec != std::errc{} || result.ptr != last)
-        return false;
-
-    x = value;
-    return true;
-}
-
 
 /////////////
 // Vectors //
 /////////////
 
-inline void vectorfilterVector(std::vector<unsigned short>& vec, const std::vector<unsigned short>& filterVec)
+void vectorfilterVector(std::vector<unsigned short>& vec, const std::vector<unsigned short>& filterVec)
 {
     if (filterVec.empty())
         return;
@@ -349,14 +301,14 @@ inline void vectorfilterVector(std::vector<unsigned short>& vec, const std::vect
         vec = std::move(vec2);
 }
 
-inline unsigned short vectorGetRandom(const std::vector<unsigned short>& vec)
+unsigned short vectorGetRandom(const std::vector<unsigned short>& vec)
 {
     if (vec.empty())
         return 0;
     return vec[CGeneral::GetRandomNumberInRange(0, (int)vec.size())];
 }
 
-inline bool vectorHasId(const std::vector<unsigned short>& vec, int id)
+bool vectorHasId(const std::vector<unsigned short>& vec, int id)
 {
     if (vec.size() < 1)
         return false;
@@ -364,7 +316,7 @@ inline bool vectorHasId(const std::vector<unsigned short>& vec, int id)
     return std::find(vec.begin(), vec.end(), id) != vec.end();
 }
 
-inline bool vectorPushUnique(std::vector<unsigned short>& vec, unsigned short value)
+bool vectorPushUnique(std::vector<unsigned short>& vec, unsigned short value)
 {
     if (std::find(vec.begin(), vec.end(), value) == vec.end())
     {
@@ -375,7 +327,7 @@ inline bool vectorPushUnique(std::vector<unsigned short>& vec, unsigned short va
     return false;
 }
 
-inline std::vector<unsigned short> vectorUnion(const std::vector<unsigned short>& vec1, const std::vector<unsigned short>& vec2)
+std::vector<unsigned short> vectorUnion(const std::vector<unsigned short>& vec1, const std::vector<unsigned short>& vec2)
 {
     if (vec1.empty())
         return vec2;
