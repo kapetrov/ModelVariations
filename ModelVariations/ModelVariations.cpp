@@ -182,10 +182,10 @@ bool loadPESection(const char* filePath, int section, std::vector<unsigned char>
     PIMAGE_SECTION_HEADER sectionHeader;
 
     auto functionError = [&](const char* msg, int errorType)
-    {
-        Log::Write("Error logging jumps. %s.\n", msg);
-        switch (errorType)
         {
+            Log::Write("Error logging jumps. %s.\n", msg);
+            switch (errorType)
+            {
             case 3:
                 UnmapViewOfFile(mapView);
                 [[fallthrough]];
@@ -194,10 +194,10 @@ bool loadPESection(const char* filePath, int section, std::vector<unsigned char>
                 [[fallthrough]];
             case 1:
                 CloseHandle(hFile);
-        }
+            }
 
-        return false;
-    };
+            return false;
+        };
 
     hFile = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
@@ -463,7 +463,8 @@ void initialize()
     uint32_t* streamingMemoryOriginal = (uint32_t*)0x5B8E6A;
     uint32_t streamingMemoryNew = 0;
     fromString<uint32_t>(iniSettings.ReadString("Limits", "StreamingMemory", ""), streamingMemoryNew);
-    streamingMemoryNew = streamingMemoryNew * 1024 * 1024;
+
+    streamingMemoryNew *= (streamingMemoryNew < 4000) ? 1048576 : 0;
     if (streamingMemoryNew > 52428800)
     {
         if (*streamingMemoryOriginal == 52428800)
@@ -474,6 +475,7 @@ void initialize()
         else
             Log::Write("Streaming memory not increased. Current streaming memory is %d\n", *streamingMemoryOriginal);
     }
+
 
     modInitialized = true;
 }
@@ -589,7 +591,7 @@ char __fastcall TransitionFinishedHooked(CEntryExit* _this, void*, CPed* ped)
     if (_this && _this->m_pLink && !transitioning)
     {
         transitioning = true;
-        auto exitPos = _this->m_pLink->m_vecExitPos;
+        CVector exitPos = _this->m_pLink->m_vecExitPos;
 
         CZone* zInfo = NULL;
         CTheZones::GetZoneInfo(&exitPos, &zInfo);
