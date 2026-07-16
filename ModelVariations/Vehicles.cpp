@@ -1049,7 +1049,7 @@ void VehicleVariations::Process()
     
     while (!vehVars.tuningStack.empty())
     {
-        const auto &it = vehVars.tuningStack.top();
+        const auto it = vehVars.tuningStack.top();
         vehVars.tuningStack.pop();
         if (!IsVehiclePointerValid(it.first))
             continue;

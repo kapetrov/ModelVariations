@@ -30,8 +30,6 @@ std::map<CPed*, std::chrono::milliseconds> delayedPeds;
 const char* slotStrings[13] = {"SLOT0", "SLOT1", "SLOT2", "SLOT3", "SLOT4", "SLOT5", "SLOT6", "SLOT7", "SLOT8", "SLOT9", "SLOT10", "SLOT11", "SLOT12"};
 bool iniHasGlobal = false;
 
-int lastMissionLoaded = -1;
-
 struct tPedWeaponOptions {
     bool weaponforceClearsWeapons = false;
     bool skipScriptedPeds = false;
@@ -432,13 +430,6 @@ bool __fastcall DoWeHaveWeaponAvailableHooked(CPed* ped, void*, eWeaponType weap
     return false;
 }
 
-template <std::uintptr_t address>
-void __cdecl CTimer__SuspendHooked()
-{
-    callOriginal<address>();
-    lastMissionLoaded = ScriptParams[0];
-}
-
 
 void PedWeaponVariations::InstallHooks()
 {
@@ -452,5 +443,4 @@ void PedWeaponVariations::InstallHooks()
     hookCall(0x48AE9E, CollectParametersHooked<0x48AE9E>, "CRunningScript::CollectParameters"); //0491: HAS_CHAR_GOT_WEAPON
     hookCall(0x68BBA0, DoWeHaveWeaponAvailableHooked<0x68BBA0>, "CTaskComplexPolicePursuit::SetWeapon"); //CTaskComplexPolicePursuit::SetWeapon
     hookCall(0x68BB32, DoWeHaveWeaponAvailableHooked<0x68BB32>, "CTaskComplexPolicePursuit::SetWeapon"); //CTaskComplexPolicePursuit::SetWeapon
-    hookCall(0x489955, CTimer__SuspendHooked<0x489955>, "CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
 }

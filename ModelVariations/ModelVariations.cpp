@@ -83,6 +83,9 @@ std::atomic<bool> newVersionFound(false);
 
 int flaMaxID = -1;
 
+int lastMissionLoaded = -1;
+int currentMission = -1;
+
 //INI Options
 bool enableLog = false;
 bool logJumps = false;
@@ -187,6 +190,7 @@ void logVariationsChange(const char* msg)
     Log::Write("\n%s (%s)\n", msg, getDatetime(false, true, true).c_str());
     Log::Write("Streaming Memory usage: %u/%u MB  Total Memory usage: %u MB\n", CStreaming__ms_memoryUsed/1024/1024, CStreaming__ms_memoryAvailable/1024/1024, getMemoryUsage()/1024/1024);
     Log::Write("Updating variations. pPos = {%f, %f, %f}\n", pPos.x, pPos.y, pPos.z);
+    Log::Write("currentMission = %d lastMissionLoaded = %u\n", currentMission, lastMissionLoaded);
     Log::Write("currentWanted = %u wanted->m_nWantedLevel = %u\n", currentWanted, wanted->m_nWantedLevel);
     Log::Write("currentZone = %.8s zInfo->m_szLabel = %.8s\n", currentZone, zInfo->m_szLabel);
 
@@ -600,6 +604,13 @@ void CPopCycle__DisplayHooked()
     callOriginal<address>();
 }
 
+template <std::uintptr_t address>
+void __cdecl CTimer__SuspendHooked()
+{
+    callOriginal<address>();
+    lastMissionLoaded = ScriptParams[0];
+}
+
 //Model names
 template <std::uintptr_t address>
 int __cdecl FileLoaderLoadObject(const char* a1)
@@ -881,6 +892,9 @@ void __cdecl CGame__ProcessHooked()
     CTheZones::GetZoneInfo(&pPos, &zInfo);
     const CWanted* wanted = FindPlayerWanted(-1);
 
+    if (!CTheScripts__IsPlayerOnAMission())
+        lastMissionLoaded = -1;
+
     if (!CEntryExitManager::mp_Active)
         transitioning = false;
 
@@ -897,6 +911,15 @@ void __cdecl CGame__ProcessHooked()
         logVariationsChange("Zone changed");
 
         *reinterpret_cast<uint64_t*>(currentZone) = *reinterpret_cast<uint64_t*>(zInfo->m_szLabel);
+        updateVariations();
+    }
+
+    if (currentMission != lastMissionLoaded)
+    {
+        logVariationsChange("Mission changed");
+
+        //lastOnMission = onMission;
+        currentMission = lastMissionLoaded;
         updateVariations();
     }
 
@@ -1115,6 +1138,7 @@ public:
         hookCall(0x40E37B, RetryLoadFileHooked<0x40E37B>, "CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
         hookCall(0x440F89, TransitionFinishedHooked<0x440F89>, "CEntryExit::TransitionFinished"); //CEntryExitManager::Update
         hookCall(0x53E293, CPopCycle__DisplayHooked<0x53E293>, "CPopCycle::Display"); //Render2dStuff
+        hookCall(0x489955, CTimer__SuspendHooked<0x489955>, "CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
 
         //CFileLoader::LoadObjectTypes
         hookCall(0x5B85DD, FileLoaderLoadObject<0x5B85DD>, "CFileLoader::LoadObject");
