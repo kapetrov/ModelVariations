@@ -1,7 +1,5 @@
 #pragma once
 
-#include "LoadedModules.hpp"
-
 #include <CGeneral.h>
 #include <CVector.h>
 
@@ -19,6 +17,7 @@ std::string printFilenameWithBorder(const std::string& name, const char ch = '#'
 bool fileExists(const std::string& filename);
 bool isTimeInRange(int timeNow, int timeStart, int timeEnd);
 std::string getDatetime(bool printDate, bool printTime, bool printMs);
+bool loadPESection(const char* filePath, int sectionIndex, std::vector<unsigned char>* buffer, unsigned int* size, std::string_view sectionName = {});
 
 ////////////
 // Random //

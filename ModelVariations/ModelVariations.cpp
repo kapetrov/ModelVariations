@@ -173,85 +173,6 @@ void checkForUpdate()
     return;
 }
 
-bool loadPESection(const char* filePath, int section, std::vector<unsigned char>& buffer, unsigned int* size)
-{
-    HANDLE hFile;
-    HANDLE hFileMapping;
-    LPVOID mapView;
-    PIMAGE_DOS_HEADER dosHeader;
-    PIMAGE_NT_HEADERS ntHeaders;
-    PIMAGE_SECTION_HEADER sectionHeader;
-
-    auto functionError = [&](const char* msg, int errorType)
-        {
-            Log::Write("Error logging jumps. %s.\n", msg);
-            switch (errorType)
-            {
-            case 3:
-                UnmapViewOfFile(mapView);
-                [[fallthrough]];
-            case 2:
-                CloseHandle(hFileMapping);
-                [[fallthrough]];
-            case 1:
-                CloseHandle(hFile);
-            }
-
-            return false;
-        };
-
-    hFile = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE)
-        return functionError("Failed to open file", 0);
-
-    // Create a file mapping
-    hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
-    if (hFileMapping == NULL)
-        return functionError("Failed to create file mapping", 1);
-
-    // Map the PE file into memory
-    mapView = MapViewOfFile(hFileMapping, FILE_MAP_READ, 0, 0, 0);
-    if (mapView == NULL)
-        return functionError("Failed to map view of file", 2);
-
-    // Get the DOS header
-    dosHeader = (PIMAGE_DOS_HEADER)mapView;
-    if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
-        return functionError("Invalid DOS signature", 3);
-
-    // Get the NT headers
-    ntHeaders = (PIMAGE_NT_HEADERS)((BYTE*)mapView + dosHeader->e_lfanew);
-    if (ntHeaders->Signature != IMAGE_NT_SIGNATURE)
-        return functionError("Invalid NT signature", 3);
-
-    // Get the section headers
-    sectionHeader = IMAGE_FIRST_SECTION(ntHeaders);
-    for (WORD i = 0; i < ntHeaders->FileHeader.NumberOfSections; ++i)
-    {
-        if (i == section)
-        {
-            *size = sectionHeader->SizeOfRawData;
-            if (buffer.size() < sectionHeader->SizeOfRawData)
-                buffer.resize(sectionHeader->SizeOfRawData);
-
-            memcpy(&buffer[0], (BYTE*)mapView + sectionHeader->PointerToRawData, *size);
-            UnmapViewOfFile(mapView);
-            CloseHandle(hFileMapping);
-            CloseHandle(hFile);
-
-            return true;
-        }
-        sectionHeader++;
-    }
-
-    // Clean up resources
-    UnmapViewOfFile(mapView);
-    CloseHandle(hFileMapping);
-    CloseHandle(hFile);
-
-    return false;
-}
-
 void logVariationsChange(const char* msg)
 {
     auto player = FindPlayerPed();
@@ -800,7 +721,7 @@ void __cdecl CGame__ProcessHooked()
         for (auto rangeStart : validRanges)
         {
             unsigned int sectionSize;
-            if (loadPESection(exePath.c_str(), sections[secCount++], buffer, &sectionSize))
+            if (loadPESection(exePath.c_str(), sections[secCount++], &buffer, &sectionSize))
                 for (unsigned int i = rangeStart; i < rangeStart + sectionSize; i++)
                 {
                     auto currentByte = *reinterpret_cast<unsigned char*>(i);
@@ -1080,6 +1001,12 @@ void __cdecl ReInitGameObjectVariablesHooked()
 class ModelVariations {
 public:
     ModelVariations() {
+
+        if (!plugin::IsGameVersion10us())
+        {
+            MessageBox(NULL, "Error! Unsupported EXE version detected!\nThis mod supports only the US v1.0 EXE.", "Model Variations", MB_ICONERROR);
+            return;
+        }
 
         GetModuleFileName(NULL, &exePath[0], 255);
         iniSettings.Load(dataFileName);
