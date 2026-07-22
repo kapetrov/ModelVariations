@@ -8,6 +8,7 @@
 #include "SA.hpp"
 
 #include <plugin.h>
+#include <ePedType.h>
 #include <CClock.h>
 #include <CFont.h>
 #include <CModelInfo.h>
@@ -601,6 +602,25 @@ void PedVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
             else if (ped->m_nCreatedBy == 3)
                 line = "PED_GAME_MISSION";
 
+            CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
+            currentOffset += lineOffset;
+        }
+
+        if (debugOptions & std::to_underlying(debugDrawPedStats::PED_TYPE))
+        {
+            std::string line;
+            static constexpr std::array<std::string_view, 32> pedTypeNames{"PED_TYPE_PLAYER1", "PED_TYPE_PLAYER2", "PED_TYPE_PLAYER_NETWORK", "PED_TYPE_PLAYER_UNUSED",
+                                                                           "PED_TYPE_CIVMALE", "PED_TYPE_CIVFEMALE", "PED_TYPE_COP", "PED_TYPE_GANG1", "PED_TYPE_GANG2",
+                                                                           "PED_TYPE_GANG3", "PED_TYPE_GANG4", "PED_TYPE_GANG5", "PED_TYPE_GANG6", "PED_TYPE_GANG7",
+                                                                           "PED_TYPE_GANG8", "PED_TYPE_GANG9", "PED_TYPE_GANG10", "PED_TYPE_DEALER", "PED_TYPE_MEDIC",
+                                                                           "PED_TYPE_FIREMAN", "PED_TYPE_CRIMINAL", "PED_TYPE_BUM", "PED_TYPE_PROSTITUTE", "PED_TYPE_SPECIAL",
+                                                                           "PED_TYPE_MISSION1", "PED_TYPE_MISSION2", "PED_TYPE_MISSION3", "PED_TYPE_MISSION4", 
+                                                                           "PED_TYPE_MISSION5", "PED_TYPE_MISSION6", "PED_TYPE_MISSION7", "PED_TYPE_MISSION8"};
+
+            if (ped->m_nPedType >= PED_TYPE_PLAYER1 && ped->m_nPedType <= PED_TYPE_MISSION8)
+                line = pedTypeNames[ped->m_nPedType];
+            else
+                line = "UNKNOWN PED TYPE";
             CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
             currentOffset += lineOffset;
         }

@@ -17,11 +17,12 @@ enum class debugDrawPedStats : uint32_t
 	POINTER = 1,
 	MODEL = 2,
 	CREATED_BY = 4,
-	PROOFS = 8,
-	HEALTH = 16,
-	ARMOUR = 32,
-	PARENT_MODEL = 64,
-	VOICE = 128
+	PED_TYPE = 8,
+	PROOFS = 16,
+	HEALTH = 32,
+	ARMOUR = 64,
+	PARENT_MODEL = 128,
+	VOICE = 256
 };
 
 struct pedTimeGroup {

@@ -441,6 +441,6 @@ void PedWeaponVariations::InstallHooks()
     hookCall(0x47D335, GiveWeaponHooked<0x47D335>, "CPed::GiveWeapon"); //01B2: GIVE_WEAPON_TO_CHAR
     hookCall(0x47D4AC, CollectParametersHooked<0x47D4AC>, "CRunningScript::CollectParameters"); //01B9: SET_CURRENT_CHAR_WEAPON
     hookCall(0x48AE9E, CollectParametersHooked<0x48AE9E>, "CRunningScript::CollectParameters"); //0491: HAS_CHAR_GOT_WEAPON
-    hookCall(0x68BBA0, DoWeHaveWeaponAvailableHooked<0x68BBA0>, "CTaskComplexPolicePursuit::SetWeapon"); //CTaskComplexPolicePursuit::SetWeapon
-    hookCall(0x68BB32, DoWeHaveWeaponAvailableHooked<0x68BB32>, "CTaskComplexPolicePursuit::SetWeapon"); //CTaskComplexPolicePursuit::SetWeapon
+    hookCall(0x68BBA0, DoWeHaveWeaponAvailableHooked<0x68BBA0>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
+    hookCall(0x68BB32, DoWeHaveWeaponAvailableHooked<0x68BB32>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
 }
