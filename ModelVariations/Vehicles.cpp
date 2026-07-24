@@ -110,6 +110,7 @@ unsigned short currentOccupantsModel = 0;
 bool tuneParkedCar = false;
 
 int occupantModelIndex = -1;
+int clumpLoadModel = -1;
 
 std::map<CVehicle*, std::vector<CVehicle*>> spawnedTrailers;  //<veh, <trailers>>
 
@@ -1965,14 +1966,33 @@ int __fastcall GetVehicleAppearanceHooked(CVehicle* veh)
 }
 
 template <std::uintptr_t address>
-int __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
+void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
 {
     if (_this->m_pVehicleStruct == NULL)
     {
-        int index = 0;
-        CModelInfo::GetModelInfoFromHashKey(_this->m_nKey, &index);
+        int index = -1;
+        auto mInfo = CModelInfo::GetModelInfoFromHashKey(_this->m_nKey, &index);
 
-        Log::Write("Model %d has NULL vehicle struct (load state = %u). Trying to load model... ", index, CStreamingInfo::ms_pArrayBase[index].m_nLoadState);
+        if (mInfo == NULL || mInfo != _this)
+        {
+            Log::Write("Vehicle model lookup failed: this=0x%08X key=0x%08X mInfo=0x%08X index=%d\n", _this, _this->m_nKey, mInfo, index);
+            return callMethodOriginalAndReturn<void*, address>(_this);
+        }
+
+        auto &streamingInfo = CStreamingInfo::ms_pArrayBase[index];
+
+        Log::Write("model=%d key=0x%08X state=%s flags=0x%02X img=%u cdPos=%u cdSize=%u next=%d prev=%d\n", index,
+                                                                                                            _this->m_nKey,
+                                                                                                            getLoadStateString(streamingInfo.m_nLoadState).c_str(),
+                                                                                                            streamingInfo.m_nFlags,
+                                                                                                            streamingInfo.m_nImgId,
+                                                                                                            streamingInfo.m_nCdPosn,
+                                                                                                            streamingInfo.m_nCdSize,
+                                                                                                            streamingInfo.m_nNextIndex,
+                                                                                                            streamingInfo.m_nPrevIndex);
+
+        Log::Write("Model %d has NULL vehicle struct (load state = %u). Trying to load model... ", index, streamingInfo.m_nLoadState);
+        clumpLoadModel = index;
         CStreaming__RequestModel(index, PRIORITY_REQUEST);
         CStreaming__LoadAllRequestedModels(false);
         if (_this->m_pVehicleStruct != NULL)
@@ -1980,13 +2000,15 @@ int __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
         else
         {
             Log::Write("\nFailed. Trying again as GAME_REQUIRED... ");
+            clumpLoadModel = index;
             CStreaming__RequestModel(index, GAME_REQUIRED);
             CStreaming__LoadAllRequestedModels(false);
             if (_this->m_pVehicleStruct != NULL)
             {
+                clumpLoadModel = -1;
                 Log::Write("OK\n");
-                CStreamingInfo::ms_pArrayBase[index].m_nFlags &= ~((uint8_t)GAME_REQUIRED);
-                return callMethodOriginalAndReturn<int, address>(_this);
+                streamingInfo.m_nFlags &= ~((uint8_t)GAME_REQUIRED);
+                return callMethodOriginalAndReturn<void*, address>(_this);
             }
 
             std::string errorString = 
@@ -1996,7 +2018,7 @@ int __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
                      "Times used: %u\n"
                      "Vehicles: %u/%u\n"
                      "VehicleStructs: %u/%u\n"
-                     "Streaming memory: %u/%u MB", index, getLoadStateString(CStreamingInfo::ms_pArrayBase[index].m_nLoadState).c_str(), _this->m_nRefCount, _this->m_nTimesUsed,
+                     "Streaming memory: %u/%u MB", index, getLoadStateString(streamingInfo.m_nLoadState).c_str(), _this->m_nRefCount, _this->m_nTimesUsed,
                                                    CPools::ms_pVehiclePool->GetNoOfUsedSpaces(), CPools::ms_pVehiclePool->m_nSize, 
                                                    CVehicleModelInfo__CVehicleStructure__m_pInfoPool->GetNoOfUsedSpaces(),
                                                    CVehicleModelInfo__CVehicleStructure__m_pInfoPool->m_nSize,
@@ -2005,9 +2027,27 @@ int __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
             MessageBox(NULL, errorString.c_str(), "Model Variations", MB_ICONERROR);
             return 0;
         }
+        clumpLoadModel = -1;
     }
 
-    return callMethodOriginalAndReturn<int, address>(_this);
+    return callMethodOriginalAndReturn<void*, address>(_this);
+}
+
+template <std::uintptr_t address>
+char __cdecl LoadClumpFileHooked(void* stream, int modelIndex)
+{
+    if (clumpLoadModel && clumpLoadModel == modelIndex)
+        Log::Write("Called LoadClumpFileHooked with stream 0x%08X for model %d\n", stream, modelIndex);
+
+    auto retVal = callOriginalAndReturn<char, address>(stream, modelIndex);
+
+    if (clumpLoadModel && clumpLoadModel == modelIndex)
+    {
+        Log::Write("LoadClumpFileHooked returned %s for model %d\n", retVal ? "true" : "false", modelIndex);
+        clumpLoadModel = -1;
+    }
+
+    return retVal;
 }
 
 template <std::uintptr_t address>
@@ -2860,6 +2900,7 @@ void VehicleVariations::InstallHooks()
     x6ABCBE_Destination = injector::MakeJMP(0x6ABCBE, patch6ABCBE).as_int();
 
     hookCall(0x85C5F4, CreateInstanceHooked<0x85C5F4>, "CVehicleModelInfo::CreateInstance", true);
+    hookCall(0x40C80F, LoadClumpFileHooked<0x40C80F>, "CFileLoader::LoadClumpFile"); //CStreaming::ConvertBufferToObject
 
     hookCall(0x4306A1, GetNewVehicleDependingOnCarModelHooked<0x4306A1>, "CCarCtrl::GetNewVehicleDependingOnCarModel"); ///CCarCtrl::GenerateOneRandomCar
 

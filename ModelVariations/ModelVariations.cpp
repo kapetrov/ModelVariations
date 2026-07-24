@@ -190,7 +190,7 @@ void logVariationsChange(const char* msg)
     Log::Write("\n%s (%s)\n", msg, getDatetime(false, true, true).c_str());
     Log::Write("Streaming Memory usage: %u/%u MB  Total Memory usage: %u MB\n", CStreaming__ms_memoryUsed/1024/1024, CStreaming__ms_memoryAvailable/1024/1024, getMemoryUsage()/1024/1024);
     Log::Write("Updating variations. pPos = {%f, %f, %f}\n", pPos.x, pPos.y, pPos.z);
-    Log::Write("currentMission = %d lastMissionLoaded = %u\n", currentMission, lastMissionLoaded);
+    Log::Write("currentMission = %d lastMissionLoaded = %d\n", currentMission, lastMissionLoaded);
     Log::Write("currentWanted = %u wanted->m_nWantedLevel = %u\n", currentWanted, wanted->m_nWantedLevel);
     Log::Write("currentZone = %.8s zInfo->m_szLabel = %.8s\n", currentZone, zInfo->m_szLabel);
 
