@@ -55,27 +55,83 @@ std::vector<std::string> splitString(const std::string& s, char separator);
 std::vector<std::string> splitString(const std::string& s, const std::string& separators);
 std::string trimString(const std::string& str);
 
-template <typename T>
-bool fromString(std::string_view str, T& x, int base = 10)
+template<class T>
+bool fromString(std::string_view s, T& x, int base = 10)
 {
-    T value{};
+    static_assert((std::is_integral_v<T> && !std::is_same_v<T, bool>) || std::is_floating_point_v<T>);
 
-    const char* first = str.data();
-    const char* last = str.data() + str.size();
+    auto p = s.begin(), e = s.end(); 
+    bool neg = p != e && *p == '-';
+    if (p != e && (*p == '-' || *p == '+'))
+        ++p;
 
-    std::from_chars_result result{};
+    if constexpr (std::is_integral_v<T>) 
+    {
+        using U = std::make_unsigned_t<T>;
+        if (base < 2 || base>36 || (!std::is_signed_v<T> && neg))
+            return false;
+        U max = std::is_signed_v<T> ? U(std::numeric_limits<T>::max()) + neg : U(-1), n = 0;
+        auto b = p;
 
-    if constexpr (std::is_integral_v<T>)
-        result = std::from_chars(first, last, value, base);
-    else if constexpr (std::is_floating_point_v<T>)
-        result = std::from_chars(first, last, value);
+        for (; p != e; ++p)
+        {
+            unsigned d = *p - '0';
+            if (d > 9) 
+            {
+                d = (*p | 32) - 'a' + 10;
+                if (d < 10)
+                    return false;       // Reject '@' and '`'
+            }
+            if (d >= unsigned(base) || n > (max - d) / base)
+                return false;
+            n = n * base + d;
+        }
+
+        if (p == b)
+            return false;
+        x = neg ? T(U(0) - n) : T(n);
+    }
     else
-        static_assert(std::is_arithmetic_v<T>, "fromString<T> only supports arithmetic types parseable by std::from_chars");
+    {
+        if (base != 10)
+            return false;
 
-    if (result.ec != std::errc{} || result.ptr != last)
-        return false;
+        constexpr uint64_t M = (uint64_t(1) << 53) - 1;
+        uint64_t n = 0, scale = 1;
+        bool dot = false, any = false;
 
-    x = value;
+        for (; p != e; ++p)
+        {
+            if (*p == '.' && !dot)
+            {
+                dot = true;
+                continue;
+            }
+
+            unsigned d = unsigned(*p - '0');
+            if (d > 9 || n > (M - d) / 10)
+                return false;
+
+            any = true;
+            n = n * 10 + d;
+
+            if (dot)
+            {
+                if (scale > M / 10)
+                    return false;
+                scale *= 10;
+            }
+        }
+
+        if (!any)
+            return false;
+
+        double v = double(n) / double(scale);
+        if (v > double(std::numeric_limits<T>::max()))
+            return false;
+
+        x = T(neg ? -v : v);
+    }
     return true;
 }
 

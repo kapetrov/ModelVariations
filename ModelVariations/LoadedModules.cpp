@@ -155,9 +155,17 @@ void LoadedModules::Refresh()
             }
         }
 
-    std::sort(loadedModules.begin(), loadedModules.end(), [](std::pair<std::string, MODULEINFO> a, std::pair<std::string, MODULEINFO> b)
+    for (size_t i = 1; i < loadedModules.size(); ++i)
     {
-        return a.second.lpBaseOfDll < b.second.lpBaseOfDll;
-    });
-}
+        auto module = std::move(loadedModules[i]);
+        size_t j = i;
 
+        while (j && loadedModules[j - 1].second.lpBaseOfDll > module.second.lpBaseOfDll)
+        {
+            loadedModules[j] = std::move(loadedModules[j - 1]);
+            --j;
+        }
+
+        loadedModules[j] = std::move(module);
+    }
+}

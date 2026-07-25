@@ -7,24 +7,24 @@
 #include <string>
 #include <unordered_map>
 
-std::unordered_map<std::uintptr_t, std::string> hooksASM;
+std::unordered_map<std::uintptr_t, const char*> hooksASM;
 std::unordered_map<std::uintptr_t, hookinfo> hookedCalls;
 
-bool hookASM(std::uintptr_t address, const std::string &originalData, injector::memory_pointer_raw hookDest, const std::string &funcName)
+bool hookASM(std::uintptr_t address, const char* originalData, injector::memory_pointer_raw hookDest, const char* funcName)
 {
-    unsigned numBytes = originalData.size() / 3 + 1;
+    unsigned numBytes = strlen(originalData) / 3 + 1;
 
-    if (!memcmp(address, originalData.c_str()) && forceEnableGlobal == false && !forceEnable.contains(address))
+    if (!memcmp(address, originalData) && forceEnableGlobal == false && !forceEnable.contains(address))
     {
         std::string bytes = bytesToString(address, numBytes);
         auto branchDestination = injector::GetBranchDestination(address).as_int();
         std::string moduleName = LoadedModules::GetModuleAtAddress(branchDestination).first;
-        std::string funcType = (funcName.find("::") != std::string::npos) ? "Modified method" : "Modified function";
+        std::string funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
 
         if (branchDestination)
-            Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s %s 0x%08X\n", funcType.c_str(), funcName.c_str(), address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
+            Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s %s 0x%08X\n", funcType.c_str(), funcName, address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
         else
-            Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s\n", funcType.c_str(), funcName.c_str(), address, bytes.c_str());
+            Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s\n", funcType.c_str(), funcName, address, bytes.c_str());
 
         return false;
     }
@@ -36,7 +36,7 @@ bool hookASM(std::uintptr_t address, const std::string &originalData, injector::
     return true;
 }
 
-void hookCall(std::uintptr_t address, void* pFunction, const std::string &name, bool isVTableAddress)
+void hookCall(std::uintptr_t address, void* pFunction, const char *name, bool isVTableAddress)
 {
     void* originalAddress;
     if (isVTableAddress)
@@ -53,6 +53,6 @@ void hookCall(std::uintptr_t address, void* pFunction, const std::string &name, 
             hookedCalls.insert({ address, {name, originalAddress, pFunction, isVTableAddress} });
         }
         else
-            Log::LogModifiedAddress(address, "Modified function call detected: %s - 0x%08X is %s\n", name.c_str(), address, bytesToString(address, 5).c_str());
+            Log::LogModifiedAddress(address, "Modified function call detected: %s - 0x%08X is %s\n", name, address, bytesToString(address, 5).c_str());
     }
 }

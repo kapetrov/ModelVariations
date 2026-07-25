@@ -9,7 +9,6 @@
 #include <plugin.h>
 #include <CCarCtrl.h>
 #include <CCarGenerator.h>
-#include <CClock.h>
 #include <CFont.h>
 #include <CHeli.h>
 #include <CModelInfo.h>
@@ -937,7 +936,7 @@ void VehicleVariations::Process()
 {
     int variationsUpdateQueued = 0;
 
-    int gameTime = (CClock::ms_nGameClockHours * 100 + CClock::ms_nGameClockMinutes);
+    int gameTime = (CClock__ms_nGameClockHours * 100 + CClock__ms_nGameClockMinutes);
 
     for (auto& it : vehVars.activeTimeGroups)
         for (auto it2 = it.second.begin(); it2 != it.second.end();)
@@ -965,7 +964,7 @@ void VehicleVariations::Process()
 
     if (variationsUpdateQueued > 0)
     {
-        std::string gameTimeString = msprintf("%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
+        std::string gameTimeString = msprintf("%02d:%02d", CClock__ms_nGameClockHours, CClock__ms_nGameClockMinutes);
         Log::Write("Updating vehicle variations due to model %d time groups. Game time: %s\n", variationsUpdateQueued, gameTimeString.c_str());
         UpdateVariations();
         VehicleVariations::LogCurrentVariations();
@@ -2084,13 +2083,10 @@ void __fastcall AddAudioEventHooked(CAEVehicleAudioEntity* audio, void*, int aud
     }
 }
 
-template <std::uintptr_t address>
-void __cdecl CWorld__RemoveHooked(CEntity* entity)
+void CWorld__RemoveHooked_impl(CVehicle* truck)
 {
-    if (entity)
+    if (truck)
     {
-        CVehicle* truck = reinterpret_cast<CVehicle*>(entity);
-
         auto it = spawnedTrailers.find(truck);
         if (it != spawnedTrailers.end())
         {
@@ -2101,6 +2097,12 @@ void __cdecl CWorld__RemoveHooked(CEntity* entity)
             spawnedTrailers.erase(it);
         }
     }
+}
+
+template <std::uintptr_t address>
+void __cdecl CWorld__RemoveHooked(CVehicle* entity)
+{
+    CWorld__RemoveHooked_impl(entity);
 
     callOriginal<address>(entity);
 }

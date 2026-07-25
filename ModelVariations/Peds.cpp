@@ -9,7 +9,6 @@
 
 #include <plugin.h>
 #include <ePedType.h>
-#include <CClock.h>
 #include <CFont.h>
 #include <CModelInfo.h>
 #include <CPed.h>
@@ -338,7 +337,7 @@ void PedVariations::Process()
     int variationsUpdateQueued = 0;
 
     static int lastGameTime = -1;
-    int gameTime = (CClock::ms_nGameClockHours * 100 + CClock::ms_nGameClockMinutes);
+    int gameTime = (CClock__ms_nGameClockHours * 100 + CClock__ms_nGameClockMinutes);
 
     if (gameTime != lastGameTime)
     {
@@ -366,7 +365,7 @@ void PedVariations::Process()
 
     if (weatherChanged)
     {
-        std::string gameTimeString = msprintf("%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
+        std::string gameTimeString = msprintf("%02d:%02d", CClock__ms_nGameClockHours, CClock__ms_nGameClockMinutes);
         Log::Write("\n[%s] Updating ped variations due to weather change. Current weather: %d %d %d %d %d. Game time: %s\n", getDatetime(false, true, true).c_str(), isRainy, isSandstorm, isFoggy, isWindy, isSunny, gameTimeString.c_str());
         UpdateVariations();
         PedVariations::LogCurrentVariations();
@@ -376,7 +375,7 @@ void PedVariations::Process()
 
     if (variationsUpdateQueued > 0)
     {
-        std::string gameTimeString = msprintf("%02d:%02d", CClock::ms_nGameClockHours, CClock::ms_nGameClockMinutes);
+        std::string gameTimeString = msprintf("%02d:%02d", CClock__ms_nGameClockHours, CClock__ms_nGameClockMinutes);
         Log::Write("Updating ped variations due to model %d time groups. Game time: %s\n", variationsUpdateQueued, gameTimeString.c_str());
         UpdateVariations();
         PedVariations::LogCurrentVariations();

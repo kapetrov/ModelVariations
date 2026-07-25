@@ -195,26 +195,76 @@ bool loadPESection(const char* filePath, int sectionIndex, std::vector<unsigned 
 // Strings //
 /////////////
 
-std::string mvsprintf(const char* fmt, va_list ap)
+std::string mvsprintf(const char* f, va_list ap)
 {
-    if (!fmt) return {};
-
-    char buf[256];
-
-    va_list copy;
-    va_copy(copy, ap);
-    int n = std::vsnprintf(buf, sizeof buf, fmt, copy);
-    va_end(copy);
-
-    if (n < 0) return {};
-
-    if ((size_t)n < sizeof buf)
-        return std::string(buf, n);
-
-    std::string out(n + 1, '\0');
-    std::vsnprintf(out.data(), out.size(), fmt, ap);
-    out.resize(n);
-
+    std::string out;
+    while (f && *f)
+    {
+        if (*f != '%') { out += *f++; continue; }
+        if (*++f == '%') { out += *f++; continue; }
+        char fill = ' ';
+        if (*f == '0') fill = *f++;
+        size_t width = 0, precision = size_t(-1);
+        for (; *f >= '0' && *f <= '9'; ++f) width = width * 10 + *f - '0';
+        if (*f == '.')
+            for (precision = 0, ++f; *f >= '0' && *f <= '9'; ++f)
+                precision = precision * 10 + *f - '0';
+        const char type = *f++;
+        if (type == 's')
+        {
+            const char* s = va_arg(ap, const char*);
+            if (!s) s = "(null)";
+            size_t n = 0;
+            while (s[n] && (precision == size_t(-1) || n < precision)) ++n;
+            if (width > n) out.append(width - n, ' ');
+            out.append(s, n);
+            continue;
+        }
+        bool negative = false;
+        unsigned value, base = 10;
+        size_t decimals = 0; double fraction = 0.0;
+        if (type == 'f')
+        {
+            double n = va_arg(ap, double);
+            if ((negative = n < 0.0)) n = -n;
+            decimals = precision == size_t(-1) ? 6 : precision;
+            double rounding = 0.5;
+            for (size_t i = decimals; i--; ) rounding *= 0.1;
+            n += rounding; const int whole = static_cast<int>(n);
+            value = static_cast<unsigned>(whole); fraction = n - whole;
+        }
+        else if (type == 'd')
+        {
+            const int n = va_arg(ap, int);
+            negative = n < 0;
+            value = negative ? 0u - static_cast<unsigned>(n) : static_cast<unsigned>(n);
+        }
+        else
+        {
+            value = va_arg(ap, unsigned);
+            if ((type | 32) == 'x') base = 16;
+        }
+        const char* alphabet = type == 'X' ? "0123456789ABCDEF" : "0123456789abcdef";
+        char digits[16], *p = digits + sizeof digits;
+        do { *--p = alphabet[value % base]; value /= base; } while (value);
+        const size_t n = digits + sizeof digits - p + negative +
+            (type == 'f' && decimals ? decimals + 1 : 0);
+        if (fill == ' ' && width > n) out.append(width - n, ' ');
+        if (negative) out += '-';
+        if (fill == '0' && width > n) out.append(width - n, '0');
+        out.append(p, digits + sizeof digits - p);
+        if (type == 'f' && decimals)
+        {
+            out += '.';
+            while (decimals--)
+            {
+                fraction *= 10.0;
+                const unsigned digit = static_cast<unsigned>(fraction);
+                out += static_cast<char>('0' + digit);
+                fraction -= digit;
+            }
+        }
+    }
     return out;
 }
 

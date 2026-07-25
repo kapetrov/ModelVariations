@@ -4,25 +4,24 @@
 
 #include <unordered_map>
 #include <set>
-#include <string>
 
 
 #include <injector/assembly.hpp>
 
 struct hookinfo {
-    std::string name;
+    const char* name;
     void* originalFunction;
     void* changedFunction;
     bool isVTableAddress;
 };
 
-extern std::unordered_map<std::uintptr_t, std::string> hooksASM;
+extern std::unordered_map<std::uintptr_t, const char*> hooksASM;
 extern std::unordered_map<std::uintptr_t, hookinfo> hookedCalls;
 extern bool forceEnableGlobal;
 extern std::set<std::uintptr_t> forceEnable;
 
-bool hookASM(std::uintptr_t address, const std::string &originalData, injector::memory_pointer_raw hookDest, const std::string &funcName);
-void hookCall(std::uintptr_t address, void* pFunction, const std::string &name, bool isVTableAddress = false);
+bool hookASM(std::uintptr_t address, const char* originalData, injector::memory_pointer_raw hookDest, const char* funcName);
+void hookCall(std::uintptr_t address, void* pFunction, const char* name, bool isVTableAddress = false);
 
 template <std::uintptr_t address, typename... Args>
 void callOriginal(Args... args)

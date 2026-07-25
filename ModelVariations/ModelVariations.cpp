@@ -253,14 +253,12 @@ void loadIniData()
     if (enableVehicles)
         VehicleVariations::LoadData();
 
-    static std::once_flag flag;
-    if (enableSpecialPeds && CModelInfo::GetModelInfo(0))
+    static bool flag = false;
+    if (!flag && enableSpecialPeds && CModelInfo::GetModelInfo(0))
     {
-        std::call_once(flag, [] 
-        {
-            PedVariations::ClearData();
-            PedVariations::LoadData();
-        });
+        flag = true;
+        PedVariations::ClearData();
+        PedVariations::LoadData();
     }
 }
 
@@ -457,16 +455,12 @@ void refreshOnGameRestart()
 
     Log::Write("-- Restart Finished (%s) --\n", getDatetime(false, true, true).c_str());
 
-    static std::once_flag flag;
-    std::call_once(flag, []
+    if (!addedIDs.empty() && Log::Write("Added IDs:\n"))
     {
-        if (!addedIDs.empty() && Log::Write("Added IDs:\n"))
-        {
-            for (auto &it : addedIDs)
-                Log::Write("%u %s\n", it.first, it.second.c_str());
-            Log::Write("\n");
-        }
-    });
+        for (auto &it : addedIDs)
+            Log::Write("%u %s\n", it.first, it.second.c_str());
+        Log::Write("\n");
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -838,7 +832,7 @@ void __cdecl CGame__ProcessHooked()
         secSinceLastModuleCheck = seconds / 30;
         for (auto& it : hookedCalls)
         {
-            if (it.second.name.empty())
+            if (it.second.name == NULL || it.second.name[0] == 0)
                 continue;
 
             const std::uintptr_t functionAddress = (it.second.isVTableAddress == false) ? injector::GetBranchDestination(it.first).as_int() : *reinterpret_cast<unsigned int*>(it.first);
@@ -848,9 +842,9 @@ void __cdecl CGame__ProcessHooked()
             if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.first).second)
             {
                 if (functionAddress > 0 && !moduleName.empty())
-                    Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second.name.c_str(), it.first, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
+                    Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second.name, it.first, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
                 else
-                    Log::Write("Modified call detected: %s 0x%08X %s\n", it.second.name.c_str(), it.first, bytesToString(it.first, 5).c_str());
+                    Log::Write("Modified call detected: %s 0x%08X %s\n", it.second.name, it.first, bytesToString(it.first, 5).c_str());
             }
 
             auto gta_saModule = LoadedModules::GetExeModule();
@@ -865,7 +859,7 @@ void __cdecl CGame__ProcessHooked()
                     std::string functionStartModuleName = functionStartModule.first.substr(functionStartModule.first.find_last_of("/\\") + 1);
 
                     if (!strcasecmp(functionStartModuleName, MOD_NAME))
-                        Log::LogModifiedAddress((std::uintptr_t)it.second.originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.second.name.c_str(), it.second.originalFunction, functionStartDestination, functionStartModuleName.c_str());
+                        Log::LogModifiedAddress((std::uintptr_t)it.second.originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.second.name, it.second.originalFunction, functionStartDestination, functionStartModuleName.c_str());
                 }
             }
         }
@@ -880,9 +874,9 @@ void __cdecl CGame__ProcessHooked()
             if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.first).second)
             {
                 if (currentDestination > 0 && !moduleName.empty())
-                    Log::Write("Modified ASM hook detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second.c_str(), it.first, currentDestination, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
+                    Log::Write("Modified ASM hook detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second, it.first, currentDestination, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
                 else
-                    Log::Write("Modified ASM hook detected: %s 0x%08X %s\n", it.second.c_str(), it.first, bytesToString(it.first, 5).c_str());
+                    Log::Write("Modified ASM hook detected: %s 0x%08X %s\n", it.second, it.first, bytesToString(it.first, 5).c_str());
             }
         }
     }

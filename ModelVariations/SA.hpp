@@ -45,6 +45,10 @@ constexpr Ret getDynamicFunction(Args... args)
 #define CAnimManager__ms_numAnimAssocDefinitions (*getPointerFromAddress<int>(0x4D5674, 0xB4EA28))
 inline char* CAnimManager__GetAnimGroupName(int index) { return getDynamicFunction<char*, 0x5B7516, 0x4D3A20>(index); }
 
+#define CClock__ms_nGameClockHours (*getPointerFromAddress<unsigned char>(0x439527, 0xB70153))
+#define CClock__ms_nGameClockMinutes (*getPointerFromAddress<unsigned char>(0x43952D, 0xB70152))
+#define CClock__ms_nGameClockSeconds (*getPointerFromAddress<unsigned char>(0x439534, 0xB70150))
+
 inline short CExternalScripts__findByScmIndex(void* _this, short scmIndex) { return getDynamicMethod<short, 0x476D56, 0x470810>(_this, scmIndex); }
 
 inline CPedModelInfo* CModelInfo__AddPedModel(int id) { return getDynamicFunction<CPedModelInfo*, 0x5B74A7, 0x4C67A0>(id); }
