@@ -12,7 +12,6 @@
 #include <plugin.h>
 #include <CCollisionData.h>
 #include <CEntryExit.h>
-#include <CEntryExitManager.h>
 #include <CFont.h>
 #include <CLoadedCarGroup.h>
 #include <CMessages.h>
@@ -487,7 +486,7 @@ char __fastcall TransitionFinishedHooked(CEntryExit* _this, void*, CPed* ped)
 {
     auto retVal = callMethodOriginalAndReturn<char, address>(_this, ped);    
 
-    if (FindPlayerPed()->m_nAreaCode == 0 || CEntryExitManager::ms_exitEnterState != 1)
+    if (FindPlayerPed()->m_nAreaCode == 0 || CEntryExitManager__ms_exitEnterState != 1)
         return retVal;
 
     if (_this && _this->m_pLink && !transitioning)
@@ -871,7 +870,7 @@ void __cdecl CGame__ProcessHooked()
     if (!CTheScripts__IsPlayerOnAMission())
         lastMissionLoaded = -1;
 
-    if (!CEntryExitManager::mp_Active)
+    if (!CEntryExitManager__mp_Active)
         transitioning = false;
 
     if (wanted && wanted->m_nWantedLevel != currentWanted)

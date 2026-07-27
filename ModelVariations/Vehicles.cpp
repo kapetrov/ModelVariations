@@ -725,7 +725,7 @@ void VehicleVariations::LoadData()
 
             for (auto& kvp : iniData.second)
             {
-                if (kvp.first.size() > 1 && isupper(kvp.first[1]))
+                if (kvp.first.size() > 1 && (kvp.first[1] < 'a' || kvp.first[1] > 'z'))
                 {
                     uint64_t zoneName = 0;
                     copyString((char*)&zoneName, kvp.first.c_str(), 8);
@@ -1067,14 +1067,14 @@ void VehicleVariations::Process()
                         CStreaming__RequestVehicleUpgrade(part, PRIORITY_REQUEST);
                         CStreaming__LoadAllRequestedModels(false);
 
-                        auto partLoadState = CStreamingInfo::ms_pArrayBase[part].m_nLoadState;
+                        auto partLoadState = CStreamingInfo__ms_pArrayBase[part].m_nLoadState;
                         
                         if (partLoadState != LOADSTATE_LOADED)
                             Log::Write("Error loading (%s) tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(partLoadState).c_str(), part, modelNames.contains(part) ? modelNames[part].c_str() : "", it.first->m_nModelIndex);
                         else
                         {
                             short otherUpgrade = CVehicleModelInfo__CLinkedUpgradeList__FindOtherUpgrade(CVehicleModelInfo__ms_linkedUpgrades, part);
-                            unsigned char pairLoadState = otherUpgrade > -1 ? CStreamingInfo::ms_pArrayBase[otherUpgrade].m_nLoadState : LOADSTATE_NOT_LOADED;
+                            unsigned char pairLoadState = otherUpgrade > -1 ? CStreamingInfo__ms_pArrayBase[otherUpgrade].m_nLoadState : LOADSTATE_NOT_LOADED;
                             if (otherUpgrade > -1 && pairLoadState != LOADSTATE_LOADED)
                             {
                                 Log::Write("Error loading (%s) pair tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(pairLoadState).c_str(), otherUpgrade, modelNames.contains(otherUpgrade) ? modelNames[otherUpgrade].c_str() : "", it.first->m_nModelIndex);
@@ -1426,7 +1426,7 @@ int __cdecl ChooseModelHooked(int* a1)
         return model;
 
     auto retVal = getRandomVariation((unsigned short)model);
-    if (CStreamingInfo::ms_pArrayBase[retVal].m_nLoadState != LOADSTATE_LOADED)
+    if (CStreamingInfo__ms_pArrayBase[retVal].m_nLoadState != LOADSTATE_LOADED)
     {
         Log::Write("ChooseModelHooked Error! Model %d is not loaded.\n", retVal);
         return -1;
@@ -1444,7 +1444,7 @@ int __cdecl ChoosePoliceCarModelHooked(int a1)
         return model;
 
     auto retVal = getRandomVariation((unsigned short)model);
-    if (CStreamingInfo::ms_pArrayBase[retVal].m_nLoadState != LOADSTATE_LOADED)
+    if (CStreamingInfo__ms_pArrayBase[retVal].m_nLoadState != LOADSTATE_LOADED)
     {
         Log::Write("ChooseModelHooked Error! Model %d is not loaded.\n", retVal);
         return -1;
@@ -1485,7 +1485,7 @@ int __fastcall PickRandomCarHooked(CLoadedCarGroup* cargrp, void*, char a2, char
         return -1;
 
     int variation = getRandomVariation(callMethodOriginalAndReturn<int, address>(cargrp, a2, a3), true);
-    if (variation > 0 && CStreamingInfo::ms_pArrayBase[variation].m_nLoadState != LOADSTATE_LOADED)
+    if (variation > 0 && CStreamingInfo__ms_pArrayBase[variation].m_nLoadState != LOADSTATE_LOADED)
     {
         Log::Write("PickRandomCarHooked Error! Model %d is not loaded.\n", variation);
         return -1;
@@ -1835,7 +1835,7 @@ CPed* __cdecl AddPedHooked(unsigned int pedType, int modelIndex, CVector* posn, 
     if (pedType == PED_TYPE_COP)
         model = getPedModelForCopType(modelIndex);
 
-    if (model > -1 && CStreamingInfo::ms_pArrayBase[model].m_nLoadState != LOADSTATE_LOADED)
+    if (model > -1 && CStreamingInfo__ms_pArrayBase[model].m_nLoadState != LOADSTATE_LOADED)
     {
         Log::Write("Error! Ped model %d is not loaded. Loading now... ", model);
         if (loadModel(model, PRIORITY_REQUEST, true) == LOADSTATE_LOADED)
@@ -1978,7 +1978,7 @@ void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
             return callMethodOriginalAndReturn<void*, address>(_this);
         }
 
-        auto &streamingInfo = CStreamingInfo::ms_pArrayBase[index];
+        auto &streamingInfo = CStreamingInfo__ms_pArrayBase[index];
 
         Log::Write("model=%d key=0x%08X state=%s flags=0x%02X img=%u cdPos=%u cdSize=%u next=%d prev=%d\n", index,
                                                                                                             _this->m_nKey,

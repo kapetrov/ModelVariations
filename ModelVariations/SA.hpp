@@ -49,6 +49,9 @@ inline char* CAnimManager__GetAnimGroupName(int index) { return getDynamicFuncti
 #define CClock__ms_nGameClockMinutes (*getPointerFromAddress<unsigned char>(0x43952D, 0xB70152))
 #define CClock__ms_nGameClockSeconds (*getPointerFromAddress<unsigned char>(0x439534, 0xB70150))
 
+#define CEntryExitManager__mp_Active (*getPointerFromAddress<uint32_t>(0x440F7B, 0x96A7D4))
+#define CEntryExitManager__ms_exitEnterState (*getPointerFromAddress<int>(0x43FFF8, 0x96A7CC))
+
 inline short CExternalScripts__findByScmIndex(void* _this, short scmIndex) { return getDynamicMethod<short, 0x476D56, 0x470810>(_this, scmIndex); }
 
 inline CPedModelInfo* CModelInfo__AddPedModel(int id) { return getDynamicFunction<CPedModelInfo*, 0x5B74A7, 0x4C67A0>(id); }
@@ -76,6 +79,8 @@ inline void CStreaming__RequestVehicleUpgrade(int model, int flags) { getDynamic
 inline void CStreaming__SetMissionDoesntRequireModel(int model) { getDynamicFunction<void, 0x40B49D, 0x409C90>(model); }
 inline void CStreaming__SetModelIsDeletable(int model) { getDynamicFunction<void, 0x40A2AD, 0x409C10>(model); }
 inline void CStreaming__SetModelTxdIsDeletable(int model) { getDynamicFunction<void, 0x43A15A, 0x409C70>(model); }
+
+#define CStreamingInfo__ms_pArrayBase (*getPointerFromAddress<CStreamingInfo*>(0x408867, {0x9654B4}))
 
 inline bool CTheScripts__IsPlayerOnAMission() { return getDynamicFunction<bool, 0x571582, 0x464D50>(); }
 inline void CTheScripts__RemoveThisPed(void* ped) { getDynamicFunction<void, 0x409DE2, 0x486240>(ped); }
@@ -121,7 +126,7 @@ inline unsigned char loadModel(int model, int streamingFlags, bool loadImmediate
     if (loadImmediately)
         CStreaming__LoadAllRequestedModels(false);
 
-    return CStreamingInfo::ms_pArrayBase[static_cast<unsigned short>(model)].m_nLoadState;
+    return CStreamingInfo__ms_pArrayBase[static_cast<unsigned short>(model)].m_nLoadState;
 }
 
 inline void destroyPed(CPed* ped)
