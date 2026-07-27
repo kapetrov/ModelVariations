@@ -2,19 +2,15 @@
 #include "Helpers.hpp"
 
 #include <cstdarg>
-#include <mutex>
 #include <set>
 
 #include <Windows.h>
 
 HANDLE logfile = INVALID_HANDLE_VALUE;
 std::set<std::uintptr_t> modifiedAddresses;
-std::mutex logMutex;
 
 bool Log::Open(const std::string &filename)
 {
-	std::lock_guard<std::mutex> lock(logMutex);
-
 	if (logfile != INVALID_HANDLE_VALUE)
 	{
 		CloseHandle(logfile);
@@ -29,8 +25,6 @@ bool Log::Open(const std::string &filename)
 
 bool Log::Close()
 {
-	std::lock_guard<std::mutex> lock(logMutex);
-
 	if (logfile == INVALID_HANDLE_VALUE)
 		return true;
 
@@ -41,8 +35,6 @@ bool Log::Close()
 
 bool Log::Write(const char* format, ...)
 {
-	std::lock_guard<std::mutex> lock(logMutex);
-
 	if (logfile == INVALID_HANDLE_VALUE)
 		return false;
 
@@ -68,8 +60,6 @@ bool Log::Write(const char* format, ...)
 
 bool Log::LogModifiedAddress(std::uintptr_t address, const char* format, ...)
 {
-	std::lock_guard<std::mutex> lock(logMutex);
-
 	if (logfile == INVALID_HANDLE_VALUE || modifiedAddresses.contains(address))
 		return false;
 

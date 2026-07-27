@@ -26,7 +26,6 @@
 #include <chrono>
 #include <map>
 #include <set>
-#include <thread>
 
 #include <urlmon.h>
 
@@ -78,8 +77,7 @@ bool jumpsLogged = false;
 
 bool keyDown = false;
 
-std::atomic<bool> checkingForUpdates(false);
-std::atomic<bool> newVersionFound(false);
+bool newVersionFound = false;
 
 int flaMaxID = -1;
 
@@ -113,34 +111,9 @@ std::set<std::uintptr_t> forceEnable;
 
 bool modInitialized = false;
 
-std::jthread updatesThread;
-
-void checkForUpdate()
+bool checkForUpdate()
 {
-    checkingForUpdates = true;
-
-    struct Guard {
-        std::atomic<bool>& flag;
-        ~Guard() { flag.store(false); }
-    } guard{ checkingForUpdates };
-
-    IStream* stream;
-
-    if (URLOpenBlockingStream(0, "http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", &stream, 0, 0) != S_OK)
-    {
-        Log::Write("Check for updates failed. Cannot open connection.\n");
-        return;
-    }
-
-    std::string str(51, 0);
-    if (stream->Read(&str[0], 50, NULL) != S_OK)
-    {
-        Log::Write("Check for updates failed.\n");
-        stream->Release();
-        return;
-    }
-
-    stream->Release();
+    std::string str = fileToString("version.json");
 
     if (auto start = str.find("\"v"); start != std::string::npos)
         if (auto end = str.find_first_of('"', start+1); end != std::string::npos && end > start + 2)
@@ -159,21 +132,35 @@ void checkForUpdate()
                 fromString<int>(oldV[i], n2);
 
                 if (n1 == INT_MAX || n2 == INT_MAX) 
-                    return;
+                    return false;
                 if (n1 > n2)
-                {
-                    newVersionFound = true;
-                    return;
-                }
-                else if (n1 < n2) 
-                    return;
+                    return true;
+                if (n1 < n2) 
+                    return false;
             }
 
-            return; // equal
+            return false; // equal
         }
 
-    Log::Write("Check for updates failed. Invalid version string.\n");
-    return;
+    return false;
+}
+
+struct Download {
+    std::string url, path;
+
+    static void CALLBACK run(PTP_CALLBACK_INSTANCE, void* p)
+    {
+        auto d = static_cast<Download*>(p);
+        URLDownloadToFileA(nullptr, d->url.c_str(), d->path.c_str(), 0, nullptr);
+        delete d;
+    }
+};
+
+void download_async(PCSTR url, PCSTR path)
+{
+    auto d = new Download{ url, path };
+    if (!TrySubmitThreadpoolCallback(Download::run, d, nullptr))
+        delete d;
 }
 
 void logVariationsChange(const char* msg)
@@ -440,12 +427,7 @@ void refreshOnGameRestart()
 
     Log::Write("\n\n");
 
-    if (!checkingForUpdates)
-    {
-        if (updatesThread.joinable())
-            updatesThread.join();
-        updatesThread = std::jthread(checkForUpdate);
-    }
+    newVersionFound = checkForUpdate();
 
     int finalTime = (int)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime).count();
     if (finalTime < 1000)
@@ -935,9 +917,6 @@ void __cdecl CGame__ShutdownHooked()
             pedsModels[i].m_pHitColModel = NULL;
     }
 
-    if (updatesThread.joinable())
-        updatesThread.join();
-
     callOriginal<address>();
 
     Log::Write("Shutdown ok.\n");
@@ -1019,6 +998,8 @@ class ModelVariations {
 public:
     ModelVariations() {
 
+        //Create update thread here
+
         if (!plugin::IsGameVersion10us())
         {
             MessageBox(NULL, "Error! Unsupported EXE version detected!\nThis mod supports only the US v1.0 EXE.", "Model Variations", MB_ICONERROR);
@@ -1026,6 +1007,8 @@ public:
         }
 
         GetModuleFileName(NULL, &exePath[0], 255);
+        download_async("http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", (LoadedModules::GetSelfDirectory() + "\\version.json").c_str());
+
         iniSettings.Load(dataFileName);
 
         trackReferenceCounts = iniSettings.ReadInteger("Settings", "TrackReferenceCounts", -1);
