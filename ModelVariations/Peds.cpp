@@ -994,28 +994,28 @@ void PedVariations::InstallHooks(bool enableSpecialPeds)
                 injector::WriteMemory<int16_t*>(0x43D6CF, &destroyedModelCounters[0], true);
             }
 
-            hookCall(0x47360D, getKillsByPlayer<0x47360D>, "CDarkel::FindTotalPedsKilledByPlayer");
+            hookCall<0x47360D>(getKillsByPlayer<0x47360D>, "CDarkel::FindTotalPedsKilledByPlayer");
         }
         else
             Log::Write("Count of killable model IDs was not increased. %s\n", (LoadedModules::IsModLoaded(MOD_FLA) ? "FLA is loaded." : "FLA is NOT loaded."));
     }
 
 
-    hookCall(0x5E4890, SetModelIndexHooked<0x5E4890>, "CEntity::SetModelIndex");
-    hookCall(0x5E49EF, UpdateRpHAnimHooked<0x5E49EF>, "CEntity::UpdateRpHAnim");
+    hookCall<0x5E4890>(SetModelIndexHooked<0x5E4890>, "CEntity::SetModelIndex");
+    hookCall<0x5E49EF>(UpdateRpHAnimHooked<0x5E49EF>, "CEntity::UpdateRpHAnim");
 
-    hookCall(0x5DDBB8, CAEPedSpeechAudioEntity__InitialiseHooked<0x5DDBB8>, "CAEPedSpeechAudioEntity::Initialise"); //CCivilianPed
-    hookCall(0x5DDD24, CAEPedSpeechAudioEntity__InitialiseHooked<0x5DDD24>, "CAEPedSpeechAudioEntity::Initialise"); //CCopPed
-    hookCall(0x5DE388, CAEPedSpeechAudioEntity__InitialiseHooked<0x5DE388>, "CAEPedSpeechAudioEntity::Initialise"); //CEmergencyPed
+    hookCall<0x5DDBB8>(CAEPedSpeechAudioEntity__InitialiseHooked<0x5DDBB8>, "CAEPedSpeechAudioEntity::Initialise"); //CCivilianPed
+    hookCall<0x5DDD24>(CAEPedSpeechAudioEntity__InitialiseHooked<0x5DDD24>, "CAEPedSpeechAudioEntity::Initialise"); //CCopPed
+    hookCall<0x5DE388>(CAEPedSpeechAudioEntity__InitialiseHooked<0x5DE388>, "CAEPedSpeechAudioEntity::Initialise"); //CEmergencyPed
 
-    hookCall(0x5E8052, CPhysicalHooked<0x5E8052>, "CPhysical::CPhysical"); //CPed::CPed
+    hookCall<0x5E8052>(CPhysicalHooked<0x5E8052>, "CPhysical::CPhysical"); //CPed::CPed
 
-    hookCall(0x870A4C, CreateNextSubTaskHooked<0x870A4C>, "CTaskComplexCopInCar::CreateNextSubTask", true);
+    hookCall<0x870A4C>(CreateNextSubTaskHooked<0x870A4C>, "CTaskComplexCopInCar::CreateNextSubTask", true);
 
     if (pedOptions.improveCivilianVariety)
     {
-        hookCall(0x61302B, PedIsAcceptableInCurrentZoneHooked<0x61302B>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
-        hookCall(0x61330D, PedIsAcceptableInCurrentZoneHooked<0x61330D>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
-        hookCall(0x613B32, ChooseCivilianOccupationForVehicleHooked<0x613B32>, "CPopulation::ChooseCivilianOccupationForVehicle"); //CPopulation::AddPedInCar
+        hookCall<0x61302B>(PedIsAcceptableInCurrentZoneHooked<0x61302B>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
+        hookCall<0x61330D>(PedIsAcceptableInCurrentZoneHooked<0x61330D>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
+        hookCall<0x613B32>(ChooseCivilianOccupationForVehicleHooked<0x613B32>, "CPopulation::ChooseCivilianOccupationForVehicle"); //CPopulation::AddPedInCar
     }
 }

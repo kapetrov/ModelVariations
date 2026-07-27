@@ -433,14 +433,14 @@ bool __fastcall DoWeHaveWeaponAvailableHooked(CPed* ped, void*, eWeaponType weap
 
 void PedWeaponVariations::InstallHooks()
 {
-    hookCall(0x5DDB92, CPedHooked<0x5DDB92>, "CPed::CPed"); //CCivilianPed::CCivilianPed
-    hookCall(0x5DDC81, CPedHooked<0x5DDC81>, "CPed::CPed"); //CCop::CCop
-    hookCall(0x5DE362, CPedHooked<0x5DE362>, "CPed::CPed"); //CEmergencyPed::CEmergencyPed
+    hookCall<0x5DDB92>(CPedHooked<0x5DDB92>, "CPed::CPed"); //CCivilianPed::CCivilianPed
+    hookCall<0x5DDC81>(CPedHooked<0x5DDC81>, "CPed::CPed"); //CCop::CCop
+    hookCall<0x5DE362>(CPedHooked<0x5DE362>, "CPed::CPed"); //CEmergencyPed::CEmergencyPed
 
-    hookCall(0x62A12E, GiveWeaponAtStartOfFightHooked<0x62A12E>, "CPed::GiveWeaponAtStartOfFight"); //CTaskSimpleFightingControl::ProcessPed
-    hookCall(0x47D335, GiveWeaponHooked<0x47D335>, "CPed::GiveWeapon"); //01B2: GIVE_WEAPON_TO_CHAR
-    hookCall(0x47D4AC, CollectParametersHooked<0x47D4AC>, "CRunningScript::CollectParameters"); //01B9: SET_CURRENT_CHAR_WEAPON
-    hookCall(0x48AE9E, CollectParametersHooked<0x48AE9E>, "CRunningScript::CollectParameters"); //0491: HAS_CHAR_GOT_WEAPON
-    hookCall(0x68BBA0, DoWeHaveWeaponAvailableHooked<0x68BBA0>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
-    hookCall(0x68BB32, DoWeHaveWeaponAvailableHooked<0x68BB32>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
+    hookCall<0x62A12E>(GiveWeaponAtStartOfFightHooked<0x62A12E>, "CPed::GiveWeaponAtStartOfFight"); //CTaskSimpleFightingControl::ProcessPed
+    hookCall<0x47D335>(GiveWeaponHooked<0x47D335>, "CPed::GiveWeapon"); //01B2: GIVE_WEAPON_TO_CHAR
+    hookCall<0x47D4AC>(CollectParametersHooked<0x47D4AC>, "CRunningScript::CollectParameters"); //01B9: SET_CURRENT_CHAR_WEAPON
+    hookCall<0x48AE9E>(CollectParametersHooked<0x48AE9E>, "CRunningScript::CollectParameters"); //0491: HAS_CHAR_GOT_WEAPON
+    hookCall<0x68BBA0>(DoWeHaveWeaponAvailableHooked<0x68BBA0>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
+    hookCall<0x68BB32>(DoWeHaveWeaponAvailableHooked<0x68BB32>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
 }

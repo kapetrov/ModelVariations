@@ -811,53 +811,53 @@ void __cdecl CGame__ProcessHooked()
         static std::set<std::uintptr_t> callChecks;
 
         secSinceLastModuleCheck = seconds / 30;
-        for (auto& it : hookedCalls)
+        for (const auto& it : getHookedCalls())
         {
-            if (it.second.name == NULL || it.second.name[0] == 0)
+            if (it.name == NULL || it.name[0] == 0)
                 continue;
 
-            const std::uintptr_t functionAddress = (it.second.isVTableAddress == false) ? injector::GetBranchDestination(it.first).as_int() : *reinterpret_cast<unsigned int*>(it.first);
+            const std::uintptr_t functionAddress = (it.isVTableAddress == false) ? injector::GetBranchDestination(it.address).as_int() : *reinterpret_cast<unsigned int*>(it.address);
             std::pair<std::string, MODULEINFO> moduleInfo = LoadedModules::GetModuleAtAddress(functionAddress);
             std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
 
-            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.first).second)
+            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.address).second)
             {
                 if (functionAddress > 0 && !moduleName.empty())
-                    Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second.name, it.first, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
+                    Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.name, it.address, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
                 else
-                    Log::Write("Modified call detected: %s 0x%08X %s\n", it.second.name, it.first, bytesToString(it.first, 5).c_str());
+                    Log::Write("Modified call detected: %s 0x%08X %s\n", it.name, it.address, bytesToString(it.address, 5).c_str());
             }
 
             auto gta_saModule = LoadedModules::GetExeModule();
             std::uintptr_t gta_saEndAddress = ((std::uintptr_t)gta_saModule.second.lpBaseOfDll + gta_saModule.second.SizeOfImage);
 
-            if ((std::uintptr_t)it.second.originalFunction < gta_saEndAddress)
+            if ((std::uintptr_t)it.originalFunction < gta_saEndAddress)
             {
-                auto functionStartDestination = injector::GetBranchDestination(it.second.originalFunction).as_int();
+                auto functionStartDestination = injector::GetBranchDestination(it.originalFunction).as_int();
                 if (functionStartDestination && functionStartDestination > gta_saEndAddress)
                 {
                     auto functionStartModule = LoadedModules::GetModuleAtAddress(functionStartDestination);
                     std::string functionStartModuleName = functionStartModule.first.substr(functionStartModule.first.find_last_of("/\\") + 1);
 
                     if (!strcasecmp(functionStartModuleName, MOD_NAME))
-                        Log::LogModifiedAddress((std::uintptr_t)it.second.originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.second.name, it.second.originalFunction, functionStartDestination, functionStartModuleName.c_str());
+                        Log::LogModifiedAddress((std::uintptr_t)it.originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.name, it.originalFunction, functionStartDestination, functionStartModuleName.c_str());
                 }
             }
         }
 
-        for (auto& it : hooksASM)
+        for (const auto& it : getASMHooks())
         {
-            const auto currentDestination = injector::GetBranchDestination(it.first).as_int();
+            const auto currentDestination = injector::GetBranchDestination(it.address).as_int();
 
             std::pair<std::string, MODULEINFO> moduleInfo = LoadedModules::GetModuleAtAddress(currentDestination);
             std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
 
-            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.first).second)
+            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.address).second)
             {
                 if (currentDestination > 0 && !moduleName.empty())
-                    Log::Write("Modified ASM hook detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.second, it.first, currentDestination, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
+                    Log::Write("Modified ASM hook detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.name, it.address, currentDestination, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
                 else
-                    Log::Write("Modified ASM hook detected: %s 0x%08X %s\n", it.second, it.first, bytesToString(it.first, 5).c_str());
+                    Log::Write("Modified ASM hook detected: %s 0x%08X %s\n", it.name, it.address, bytesToString(it.address, 5).c_str());
             }
         }
     }
@@ -1104,39 +1104,39 @@ public:
 
         if (enableStreamingFix)
         {
-            hookCall(0x408D43, AddToLoadedVehiclesListHooked<0x408D43>, "CStreaming::AddToLoadedVehiclesList"); //CStreaming::FinishLoadingLargeFile
-            hookCall(0x40C858, AddToLoadedVehiclesListHooked<0x40C858>, "CStreaming::AddToLoadedVehiclesList"); //CStreaming::ConvertBufferToObject
+            hookCall<0x408D43>(AddToLoadedVehiclesListHooked<0x408D43>, "CStreaming::AddToLoadedVehiclesList"); //CStreaming::FinishLoadingLargeFile
+            hookCall<0x40C858>(AddToLoadedVehiclesListHooked<0x40C858>, "CStreaming::AddToLoadedVehiclesList"); //CStreaming::ConvertBufferToObject
         }
         else
             Log::Write("Streaming fix disabled.\n");
 
-        hookCall(0x440840, InteriorManager_c__UpdateHooked<0x440840>, "InteriorManager_c::Update"); //CEntryExit::TransitionFinished
-        hookCall(0x40E37B, RetryLoadFileHooked<0x40E37B>, "CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
-        hookCall(0x440F89, TransitionFinishedHooked<0x440F89>, "CEntryExit::TransitionFinished"); //CEntryExitManager::Update
-        hookCall(0x53E293, CPopCycle__DisplayHooked<0x53E293>, "CPopCycle::Display"); //Render2dStuff
-        hookCall(0x489955, CTimer__SuspendHooked<0x489955>, "CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
+        hookCall<0x440840>(InteriorManager_c__UpdateHooked<0x440840>, "InteriorManager_c::Update"); //CEntryExit::TransitionFinished
+        hookCall<0x40E37B>(RetryLoadFileHooked<0x40E37B>, "CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
+        hookCall<0x440F89>(TransitionFinishedHooked<0x440F89>, "CEntryExit::TransitionFinished"); //CEntryExitManager::Update
+        hookCall<0x53E293>(CPopCycle__DisplayHooked<0x53E293>, "CPopCycle::Display"); //Render2dStuff
+        hookCall<0x489955>(CTimer__SuspendHooked<0x489955>, "CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
 
         //CFileLoader::LoadObjectTypes
-        hookCall(0x5B85DD, FileLoaderLoadObject<0x5B85DD>, "CFileLoader::LoadObject");
-        hookCall(0x5B862C, FileLoaderLoadObject<0x5B862C>, "CFileLoader::LoadTimeObject");
-        hookCall(0x5B8634, FileLoaderLoadObject<0x5B8634>, "CFileLoader::LoadWeaponObject");
-        hookCall(0x5B863C, FileLoaderLoadObject<0x5B863C>, "CFileLoader::LoadClumpObject");
-        hookCall(0x5B8644, FileLoaderLoadObject<0x5B8644>, "CFileLoader::LoadAnimatedClumpObject");
-        hookCall(0x5B864C, FileLoaderLoadObject<0x5B864C>, "CFileLoader::LoadVehicleObject");
-        hookCall(0x5B8654, FileLoaderLoadObject<0x5B8654>, "CFileLoader::LoadPedObject");
+        hookCall<0x5B85DD>(FileLoaderLoadObject<0x5B85DD>, "CFileLoader::LoadObject");
+        hookCall<0x5B862C>(FileLoaderLoadObject<0x5B862C>, "CFileLoader::LoadTimeObject");
+        hookCall<0x5B8634>(FileLoaderLoadObject<0x5B8634>, "CFileLoader::LoadWeaponObject");
+        hookCall<0x5B863C>(FileLoaderLoadObject<0x5B863C>, "CFileLoader::LoadClumpObject");
+        hookCall<0x5B8644>(FileLoaderLoadObject<0x5B8644>, "CFileLoader::LoadAnimatedClumpObject");
+        hookCall<0x5B864C>(FileLoaderLoadObject<0x5B864C>, "CFileLoader::LoadVehicleObject");
+        hookCall<0x5B8654>(FileLoaderLoadObject<0x5B8654>, "CFileLoader::LoadPedObject");
 
-        hookCall(0x40F716, RemoveTrianglePlanesHooked<0x40F716>, "CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
-        hookCall(0x40F9F1, RemoveTrianglePlanesHooked<0x40F9F1>, "CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
-        //hookCall(0x4185AF, RemoveTrianglePlanesHooked<0x4185AF>, "CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
+        hookCall<0x40F716>(RemoveTrianglePlanesHooked<0x40F716>, "CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
+        hookCall<0x40F9F1>(RemoveTrianglePlanesHooked<0x40F9F1>, "CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
+        //hookCall<0x4185AF>(RemoveTrianglePlanesHooked<0x4185AF>, "CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
         if (isGameHOODLUM())
-            hookCall(0x156FB57, RemoveTrianglePlanesHooked<0x156FB57>, "CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+            hookCall<0x156FB57>(RemoveTrianglePlanesHooked<0x156FB57>, "CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
         else
-            hookCall(0x40F0E7, RemoveTrianglePlanesHooked<0x40F0E7>, "CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+            hookCall<0x40F0E7>(RemoveTrianglePlanesHooked<0x40F0E7>, "CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
 
-        hookCall(0x53E981, CGame__ProcessHooked<0x53E981>, "CGame::Process"); //Idle
-        hookCall(0x748E6B, CGame__ShutdownHooked<0x748E6B>, "CGame::Shutdown"); //WinMain
-        hookCall(0x748CFB, InitialiseGameHooked<0x748CFB>, "InitialiseGame"); //WinMain
-        hookCall(0x5BF3A1, InitialiseRenderWareHooked<0x5BF3A1>, "CGame::InitialiseRenderWare"); //RwInitialize
-        hookCall(0x53C6DB, ReInitGameObjectVariablesHooked<0x53C6DB>, "CGame::ReInitGameObjectVariables"); //CGame::InitialiseWhenRestarting
+        hookCall<0x53E981>(CGame__ProcessHooked<0x53E981>, "CGame::Process"); //Idle
+        hookCall<0x748E6B>(CGame__ShutdownHooked<0x748E6B>, "CGame::Shutdown"); //WinMain
+        hookCall<0x748CFB>(InitialiseGameHooked<0x748CFB>, "InitialiseGame"); //WinMain
+        hookCall<0x5BF3A1>(InitialiseRenderWareHooked<0x5BF3A1>, "CGame::InitialiseRenderWare"); //RwInitialize
+        hookCall<0x53C6DB>(ReInitGameObjectVariablesHooked<0x53C6DB>, "CGame::ReInitGameObjectVariables"); //CGame::InitialiseWhenRestarting
     }
 } modelVariations;
