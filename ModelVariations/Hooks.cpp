@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <string>
 
 namespace {
@@ -55,39 +56,35 @@ void logMissingOriginalMethod(std::uintptr_t address)
     Log::Write("Error! Original method not found for address 0x%08X\n", address);
 }
 
-bool hookASM(std::uintptr_t address, const char* originalData, injector::memory_pointer_raw hookDest, const char* funcName)
+bool hookASM(std::uintptr_t address, std::initializer_list<std::uint8_t> originalData, injector::memory_pointer_raw hookDest, const char* funcName)
 {
-    unsigned numBytes = strlen(originalData) / 3 + 1;
-
-    if (!memcmp(address, originalData) && forceEnableGlobal == false && !forceEnable.contains(address))
+    if (memoryMatches(address, originalData) || forceEnableGlobal || forceEnable.contains(address))
     {
-        std::string bytes = bytesToString(address, numBytes);
-        auto branchDestination = injector::GetBranchDestination(address).as_int();
-        std::string moduleName = LoadedModules::GetModuleAtAddress(branchDestination).first;
-
-        if (funcName && branchDestination)
-        {
-            const char* funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
-            Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s %s 0x%08X\n", funcType, funcName, address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
-        }
-        else if (funcName)
-        {
-            const char* funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
-            Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s\n", funcType, funcName, address, bytes.c_str());
-        }
-        else if (branchDestination)
-            Log::LogModifiedAddress(address, "Modified ASM hook detected: 0x%08X is %s %s 0x%08X\n", address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
-        else
-            Log::LogModifiedAddress(address, "Modified ASM hook detected: 0x%08X is %s\n", address, bytes.c_str());
-
-        return false;
+        injector::MakeJMP(address, hookDest);
+        storeHookDescriptor(hooksASM, asmHookCount, { address, funcName });
+        return true;
     }
+    
+    std::string bytes = bytesToString(address, originalData.size());
+    auto branchDestination = injector::GetBranchDestination(address).as_int();
+    std::string moduleName = LoadedModules::GetModuleAtAddress(branchDestination).first;
 
-    injector::MakeJMP(address, hookDest);
+    if (funcName && branchDestination)
+    {
+        const char* funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
+        Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s %s 0x%08X\n", funcType, funcName, address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
+    }
+    else if (funcName)
+    {
+        const char* funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
+        Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s\n", funcType, funcName, address, bytes.c_str());
+    }
+    else if (branchDestination)
+        Log::LogModifiedAddress(address, "Modified ASM hook detected: 0x%08X is %s %s 0x%08X\n", address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
+    else
+        Log::LogModifiedAddress(address, "Modified ASM hook detected: 0x%08X is %s\n", address, bytes.c_str());
 
-    storeHookDescriptor(hooksASM, asmHookCount, { address, funcName });
-
-    return true;
+    return false;
 }
 
 void* hookCallImpl(std::uintptr_t address, void* pFunction, const char* name, bool isVTableAddress)

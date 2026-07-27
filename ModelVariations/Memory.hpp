@@ -4,8 +4,23 @@
 
 #include <injector/injector.hpp>
 
-bool memcmp(std::uintptr_t address, const char* value);
-void WriteMemory(std::uintptr_t address, const char *value);
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+
+bool memoryMatches(std::uintptr_t address, const std::uint8_t* expected, std::size_t size) noexcept;
+
+inline bool memoryMatches(std::uintptr_t address, std::initializer_list<std::uint8_t> expected) noexcept
+{
+    return memoryMatches(address, expected.begin(), expected.size());
+}
+
+template <std::size_t Size>
+bool memoryMatches(std::uintptr_t address, const std::array<std::uint8_t, Size>& expected) noexcept
+{
+    return memoryMatches(address, expected.data(), expected.size());
+}
 
 template <typename T>
 void WriteMemory(std::uintptr_t address, int value)

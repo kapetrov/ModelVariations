@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <initializer_list>
 #include <set>
 #include <span>
 #include <type_traits>
@@ -24,7 +25,7 @@ struct asmhookinfo {
 extern bool forceEnableGlobal;
 extern std::set<std::uintptr_t> forceEnable;
 
-bool hookASM(std::uintptr_t address, const char* originalData, injector::memory_pointer_raw hookDest, const char* funcName);
+bool hookASM(std::uintptr_t address, std::initializer_list<std::uint8_t> originalData, injector::memory_pointer_raw hookDest, const char* funcName);
 void* hookCallImpl(std::uintptr_t address, void* pFunction, const char* name, bool isVTableAddress);
 void logMissingOriginalFunction(std::uintptr_t address);
 void logMissingOriginalMethod(std::uintptr_t address);
