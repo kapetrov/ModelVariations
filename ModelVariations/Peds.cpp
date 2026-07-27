@@ -964,10 +964,10 @@ void PedVariations::InstallHooks(bool enableSpecialPeds)
         bool notModified = true;
 
         //Count of killable model IDs
-        if (!memoryMatches(0x43DE6C, {0x66, 0xFF, 0x04, 0x45, 0x50, 0x9A, 0x96, 0x00}) ||
-            !memoryMatches(0x43DF5B, {0x66, 0xFF, 0x04, 0x45, 0x50, 0x9A, 0x96, 0x00}) ||
-            !memoryMatches((gameHOODLUM ? 0x1561634U : 0x43D6A4), {0x8D, 0x04, 0x45, 0x50, 0x9A, 0x96, 0x00}) ||
-            !memoryMatches((gameHOODLUM ? 0x1564C2BU : 0x43D6CB), {0x66, 0x8B, 0x04, 0x55, 0x50, 0x9A, 0x96, 0x00}))
+        if (!memoryMatchesOriginalExe(0x43DE6C, 8) ||
+            !memoryMatchesOriginalExe(0x43DF5B, 8) ||
+            !memoryMatchesOriginalExe((gameHOODLUM ? 0x1561634U : 0x43D6A4), 7) ||
+            !memoryMatchesOriginalExe((gameHOODLUM ? 0x1564C2BU : 0x43D6CB), 8))
         {
             notModified = false;
         }

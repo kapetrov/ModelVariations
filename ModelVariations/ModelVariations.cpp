@@ -3,6 +3,7 @@
 #include "Hooks.hpp"
 #include "LoadedModules.hpp"
 #include "Log.hpp"
+#include "Memory.hpp"
 #include "SA.hpp"
 
 #include "Peds.hpp"
@@ -694,42 +695,36 @@ void __cdecl CGame__ProcessHooked()
 
     if (!jumpsLogged && logJumps && Log::Write("\nLogging JMP hooks...\n"))
     {
-        std::vector<unsigned char> buffer;
-
-        const std::vector<int> sections = isGameHOODLUM() ? std::vector<int> { 0, 1, 7, 8, 9, 10 } : std::vector<int>{ 0, 1 };
-        const std::vector<std::uintptr_t> validRanges = isGameHOODLUM() ? std::vector<std::uintptr_t> { 0x401000, 0x857000, 0xCB1000, 0x12FB000, 0x1301000, 0x1556000 } : std::vector<std::uintptr_t>{ 0x401000, 0x857000 };
         std::unordered_map<std::string, std::vector<jumpInfo>> jumpsMap;
 
         auto gta_saModule = LoadedModules::GetExeModule();
         std::uintptr_t gta_saEndAddress = ((std::uintptr_t)gta_saModule.second.lpBaseOfDll + gta_saModule.second.SizeOfImage);
-        unsigned int secCount = 0;
 
-        for (auto rangeStart : validRanges)
+        for (const auto& section : getOriginalExeSections())
         {
-            unsigned int sectionSize;
-            if (loadPESection(exePath.c_str(), sections[secCount++], &buffer, &sectionSize))
-                for (unsigned int i = rangeStart; i < rangeStart + sectionSize; i++)
+            for (std::size_t offset = 0; offset < section.data.size(); ++offset)
+            {
+                const std::uintptr_t currentAddress = section.address + offset;
+                auto currentByte = *reinterpret_cast<unsigned char*>(currentAddress);
+                if (currentByte != section.data[offset])
                 {
-                    auto currentByte = *reinterpret_cast<unsigned char*>(i);
-                    if (currentByte != buffer[i - rangeStart])
+                    auto destination = injector::GetBranchDestination(currentAddress).as_int();
+                    if (destination > gta_saEndAddress)
                     {
-                        auto destination = injector::GetBranchDestination(i).as_int();
-                        if (destination > gta_saEndAddress)
-                        {
-                            auto moduleInfo = LoadedModules::GetModuleAtAddress(destination);
-                            std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
+                        auto moduleInfo = LoadedModules::GetModuleAtAddress(destination);
+                        std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
 
-                            if (!strcasestr(moduleInfo.first, "Windows") && !strcasecmp(moduleName, MOD_NAME))
-                            {
-                                if (moduleName.empty())
-                                    jumpsMap["unknown"].push_back({ i, destination, currentByte });
-                                else
-                                    jumpsMap[moduleName].push_back({ i, destination, currentByte });
-                            }
-                            i += 3;
+                        if (!strcasestr(moduleInfo.first, "Windows") && !strcasecmp(moduleName, MOD_NAME))
+                        {
+                            if (moduleName.empty())
+                                jumpsMap["unknown"].push_back({ currentAddress, destination, currentByte });
+                            else
+                                jumpsMap[moduleName].push_back({ currentAddress, destination, currentByte });
                         }
+                        offset += 3;
                     }
                 }
+            }
         }
         for (auto& i : jumpsMap)
         {
@@ -1097,6 +1092,17 @@ public:
             PedWeaponVariations::LogDataFile();
             VehicleVariations::LogDataFile();
             Log::Write("\n");
+        }
+
+        const std::vector<int> sections = isGameHOODLUM() ? std::vector<int>{ 0, 1, 7, 8, 9, 10 } : std::vector<int>{ 0, 1 };
+        const std::vector<std::uintptr_t> sectionAddresses = isGameHOODLUM() ? std::vector<std::uintptr_t>{ 0x401000, 0x857000, 0xCB1000, 0x12FB000, 0x1301000, 0x1556000 } : 
+                                                                               std::vector<std::uintptr_t>{ 0x401000, 0x857000 };
+
+        if (!loadOriginalExeSections(exePath.c_str(), sections, sectionAddresses))
+        {
+            Log::Write("Error! Failed to retain the original executable sections. Mod initialization aborted.\n");
+            MessageBox(NULL, "Failed to load the original executable sections.", "Model Variations", MB_ICONERROR);
+            return;
         }
 
         if (loadStage == 0)

@@ -107,7 +107,7 @@ bool loadPESection(const char* filePath, int sectionIndex, std::vector<unsigned 
 
     auto functionError = [&](const char* msg, int errorType)
     {
-        Log::Write("Error logging jumps. %s.\n", msg);
+        Log::Write("Error loading executable section. %s.\n", msg);
         switch (errorType)
         {
         case 3:

@@ -10,30 +10,30 @@
 #include <string>
 
 namespace {
-constexpr std::size_t MaxHookDescriptors = 512;
+    constexpr std::size_t MaxHookDescriptors = 512;
 
-std::array<hookinfo, MaxHookDescriptors> hookedCalls;
-std::size_t hookedCallCount = 0;
-std::array<asmhookinfo, MaxHookDescriptors> hooksASM;
-std::size_t asmHookCount = 0;
+    std::array<hookinfo, MaxHookDescriptors> hookedCalls;
+    std::size_t hookedCallCount = 0;
+    std::array<asmhookinfo, MaxHookDescriptors> hooksASM;
+    std::size_t asmHookCount = 0;
 
-template <typename Descriptor, std::size_t Size>
-void storeHookDescriptor(std::array<Descriptor, Size>& descriptors, std::size_t& count, const Descriptor& descriptor)
-{
-    for (std::size_t i = 0; i < count; ++i)
+    template <typename Descriptor, std::size_t Size>
+    void storeHookDescriptor(std::array<Descriptor, Size>& descriptors, std::size_t& count, const Descriptor& descriptor)
     {
-        if (descriptors[i].address == descriptor.address)
+        for (std::size_t i = 0; i < count; ++i)
         {
-            descriptors[i] = descriptor;
-            return;
+            if (descriptors[i].address == descriptor.address)
+            {
+                descriptors[i] = descriptor;
+                return;
+            }
         }
-    }
 
-    if (count < descriptors.size())
-        descriptors[count++] = descriptor;
-    else
-        Log::Write("Error! Hook diagnostic descriptor capacity exceeded at address 0x%08X\n", descriptor.address);
-}
+        if (count < descriptors.size())
+            descriptors[count++] = descriptor;
+        else
+            Log::Write("Error! Hook diagnostic descriptor capacity exceeded at address 0x%08X\n", descriptor.address);
+    }
 }
 
 std::span<const hookinfo> getHookedCalls() noexcept
@@ -56,16 +56,16 @@ void logMissingOriginalMethod(std::uintptr_t address)
     Log::Write("Error! Original method not found for address 0x%08X\n", address);
 }
 
-bool hookASM(std::uintptr_t address, std::initializer_list<std::uint8_t> originalData, injector::memory_pointer_raw hookDest, const char* funcName)
+bool hookASM(std::uintptr_t address, std::size_t numberOfBytes, injector::memory_pointer_raw hookDest, const char* funcName)
 {
-    if (memoryMatches(address, originalData) || forceEnableGlobal || forceEnable.contains(address))
+    if (memoryMatchesOriginalExe(address, numberOfBytes) || forceEnableGlobal || forceEnable.contains(address))
     {
         injector::MakeJMP(address, hookDest);
         storeHookDescriptor(hooksASM, asmHookCount, { address, funcName });
         return true;
     }
     
-    std::string bytes = bytesToString(address, originalData.size());
+    std::string bytes = bytesToString(address, numberOfBytes);
     auto branchDestination = injector::GetBranchDestination(address).as_int();
     std::string moduleName = LoadedModules::GetModuleAtAddress(branchDestination).first;
 

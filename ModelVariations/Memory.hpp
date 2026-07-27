@@ -4,23 +4,20 @@
 
 #include <injector/injector.hpp>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
+#include <span>
+#include <vector>
 
-bool memoryMatches(std::uintptr_t address, const std::uint8_t* expected, std::size_t size) noexcept;
-
-inline bool memoryMatches(std::uintptr_t address, std::initializer_list<std::uint8_t> expected) noexcept
+struct OriginalExeSection
 {
-    return memoryMatches(address, expected.begin(), expected.size());
-}
+    std::uintptr_t address;
+    std::vector<unsigned char> data;
+};
 
-template <std::size_t Size>
-bool memoryMatches(std::uintptr_t address, const std::array<std::uint8_t, Size>& expected) noexcept
-{
-    return memoryMatches(address, expected.data(), expected.size());
-}
+bool loadOriginalExeSections(const char* filePath, std::span<const int> sectionIndices, std::span<const std::uintptr_t> sectionAddresses);
+std::span<const OriginalExeSection> getOriginalExeSections() noexcept;
+bool memoryMatchesOriginalExe(std::uintptr_t address, std::size_t size) noexcept;
 
 template <typename T>
 void WriteMemory(std::uintptr_t address, int value)
