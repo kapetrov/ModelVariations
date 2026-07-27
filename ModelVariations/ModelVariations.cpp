@@ -156,7 +156,7 @@ struct Download {
     }
 };
 
-void download_async(PCSTR url, PCSTR path)
+void download_async(std::string url, std::string path)
 {
     auto d = new Download{ url, path };
     if (!TrySubmitThreadpoolCallback(Download::run, d, nullptr))
@@ -1001,7 +1001,11 @@ public:
         }
 
         GetModuleFileName(NULL, &exePath[0], 255);
-        download_async("http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", (LoadedModules::GetSelfDirectory() + "\\version.json").c_str());
+
+        char buffer[MAX_PATH] = {};
+        DWORD len = GetTempPathA(MAX_PATH, buffer);
+        if (len != 0 && len < MAX_PATH)
+            download_async("http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", std::string(buffer) + "version.json");
 
         iniSettings.Load(dataFileName);
 

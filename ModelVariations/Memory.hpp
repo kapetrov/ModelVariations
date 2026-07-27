@@ -18,6 +18,10 @@ struct OriginalExeSection
 bool loadOriginalExeSections(const char* filePath, std::span<const int> sectionIndices, std::span<const std::uintptr_t> sectionAddresses);
 std::span<const OriginalExeSection> getOriginalExeSections() noexcept;
 bool memoryMatchesOriginalExe(std::uintptr_t address, std::size_t size) noexcept;
+size_t getMemoryUsage();
+bool isAddressValid(std::uintptr_t address);
+bool isAddressValid(void* address);
+
 
 template <typename T>
 void WriteMemory(std::uintptr_t address, int value)
@@ -30,11 +34,6 @@ void WriteMemory(std::uintptr_t address, unsigned int value)
 {
     injector::WriteMemory<T>(address, (T)value, true);
 }
-
-size_t getMemoryUsage();
-bool isAddressValid(std::uintptr_t address);
-bool isAddressValid(void* address);
-
 
 template <typename T>
 T* getPointerFromAddress(std::uintptr_t address, T* fallback, int depth = 1)
