@@ -449,29 +449,32 @@ void refreshOnGameRestart()
 ///////////////////////////////////////////  CALL HOOKS    ////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <std::uintptr_t address>
-bool __cdecl AddToLoadedVehiclesListHooked(int model)
+__declspec(noinline) bool __cdecl AddToLoadedVehiclesListHooked(int model)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (model < 612 || addedIDsInGroups.contains((unsigned short)model))
-        return callOriginalAndReturn<bool, address>(model);
+        return originalCall.callAndReturn<bool>(model);
 
     return 1;
 }
 
-template <std::uintptr_t address>
-char __fastcall InteriorManager_c__UpdateHooked(void* _this)
+__declspec(noinline) char __fastcall InteriorManager_c__UpdateHooked(void* _this)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (transitioning == false)
     {
         logVariationsChange("Interior changed");
         updateVariations();
     }
-    return callMethodOriginalAndReturn<char, address>(_this);
+    return originalCall.callMethodAndReturn<char>(_this);
 }
 
-template <std::uintptr_t address>
-void __cdecl RetryLoadFileHooked(int streamNum)
+__declspec(noinline) void __cdecl RetryLoadFileHooked(int streamNum)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (Log::Write("RetryLoadFile called for the following IDs in channel %d: ", streamNum))
     {
         for (int i = 0; i < 16; i++)
@@ -479,13 +482,13 @@ void __cdecl RetryLoadFileHooked(int streamNum)
         Log::Write("\n");
     }
 
-    callOriginal<address>(streamNum);
+    originalCall.call(streamNum);
 }
 
-template <std::uintptr_t address>
-char __fastcall TransitionFinishedHooked(CEntryExit* _this, void*, CPed* ped)
+__declspec(noinline) char __fastcall TransitionFinishedHooked(CEntryExit* _this, void*, CPed* ped)
 {
-    auto retVal = callMethodOriginalAndReturn<char, address>(_this, ped);    
+    const auto originalCall = captureCurrentOriginalCall();
+    auto retVal = originalCall.callMethodAndReturn<char>(_this, ped);
 
     if (FindPlayerPed()->m_nAreaCode == 0 || CEntryExitManager__ms_exitEnterState != 1)
         return retVal;
@@ -510,9 +513,10 @@ char __fastcall TransitionFinishedHooked(CEntryExit* _this, void*, CPed* ped)
     return retVal;
 }
 
-template <std::uintptr_t address>
-void CPopCycle__DisplayHooked()
+__declspec(noinline) void CPopCycle__DisplayHooked()
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (drawDebugText > 2 && debugDrawVehicles > 0)
         VehicleVariations::DrawDebugInfo(debugDrawSize, debugDrawVehicles);
     if ((drawDebugText == 2 || drawDebugText == 4) && debugDrawPeds > 0)
@@ -577,20 +581,21 @@ void CPopCycle__DisplayHooked()
             PrintDebugLine("%s: %.3f", isWindy ? "~y~Wind~s~" : "Wind", CWeather::Wind);
     }
 
-    callOriginal<address>();
+    originalCall.call();
 }
 
-template <std::uintptr_t address>
-void __cdecl CTimer__SuspendHooked()
+__declspec(noinline) void __cdecl CTimer__SuspendHooked()
 {
-    callOriginal<address>();
+    const auto originalCall = captureCurrentOriginalCall();
+    originalCall.call();
     lastMissionLoaded = ScriptParams[0];
 }
 
 //Model names
-template <std::uintptr_t address>
-int __cdecl FileLoaderLoadObject(const char* a1)
+__declspec(noinline) int __cdecl FileLoaderLoadObject(const char* a1)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (a1)
     {
         int id = -1;
@@ -613,12 +618,13 @@ int __cdecl FileLoaderLoadObject(const char* a1)
         }
     }
 
-    return callOriginalAndReturn<unsigned int, address>(a1);
+    return originalCall.callAndReturn<unsigned int>(a1);
 }
 
-template <std::uintptr_t address>
-void __cdecl RemoveTrianglePlanesHooked(CCollisionData* a2)
+__declspec(noinline) void __cdecl RemoveTrianglePlanesHooked(CCollisionData* a2)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (!isAddressValid(a2))
     {
         Log::Write("RemoveTrianglePlanesHooked Error! a2 is invalid (0x%X)\n", a2);
@@ -627,7 +633,7 @@ void __cdecl RemoveTrianglePlanesHooked(CCollisionData* a2)
 
     if (a2->m_pTrianglePlanes == NULL)
     {
-        callOriginal<address>(a2);
+        originalCall.call(a2);
         return;
     }
 
@@ -661,12 +667,13 @@ void __cdecl RemoveTrianglePlanesHooked(CCollisionData* a2)
         return;
     }
 
-    callOriginal<address>(a2);
+    originalCall.call(a2);
 }
 
-template <std::uintptr_t address>
-void __cdecl CGame__ProcessHooked()
+__declspec(noinline) void __cdecl CGame__ProcessHooked()
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     int totalMemory = getMemoryUsage() / 1024 / 1024;
 
     if (lowMemoryProtection > 0 && totalMemory > lowMemoryProtection && (enablePeds || enablePedWeapons || enableVehicles))
@@ -691,7 +698,7 @@ void __cdecl CGame__ProcessHooked()
 
     totalTimeSinceLoad = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - loadTime);
 
-    callOriginal<address>();
+    originalCall.call();
 
     if (!jumpsLogged && logJumps && Log::Write("\nLogging JMP hooks...\n"))
     {
@@ -900,9 +907,10 @@ void __cdecl CGame__ProcessHooked()
 
 //Fix(?) for crash on game exit when adding special peds. Something related to m_pHitColModel.
 //This is needed if PedModels in OLA is set to unlimited. If set manually to a high number (e.g PedModels=5000) the game exits ok for some reason.
-template <std::uintptr_t address>
-void __cdecl CGame__ShutdownHooked()
+__declspec(noinline) void __cdecl CGame__ShutdownHooked()
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     Log::Write("Game shutting down...\n");
 
     if (!addedIDs.empty())
@@ -911,16 +919,16 @@ void __cdecl CGame__ShutdownHooked()
             pedsModels[i].m_pHitColModel = NULL;
     }
 
-    callOriginal<address>();
+    originalCall.call();
 
     Log::Write("Shutdown ok.\n");
     Log::Close();
 }
 
-template <std::uintptr_t address>
-void __cdecl InitialiseGameHooked()
+__declspec(noinline) void __cdecl InitialiseGameHooked()
 {
-    callOriginal<address>();
+    const auto originalCall = captureCurrentOriginalCall();
+    originalCall.call();
 
     Log::Write("-- InitialiseGame Start (%s) --\n", getDatetime(false, true, true).c_str());
 
@@ -969,18 +977,18 @@ void __cdecl InitialiseGameHooked()
         refreshOnGameRestart();
 }
 
-template <std::uintptr_t address>
-void __cdecl InitialiseRenderWareHooked()
+__declspec(noinline) void __cdecl InitialiseRenderWareHooked()
 {
-    callOriginal<address>();
+    const auto originalCall = captureCurrentOriginalCall();
+    originalCall.call();
     if (loadStage == 1)
         initialize();
 }
 
-template <std::uintptr_t address>
-void __cdecl ReInitGameObjectVariablesHooked()
+__declspec(noinline) void __cdecl ReInitGameObjectVariablesHooked()
 {
-    callOriginal<address>();
+    const auto originalCall = captureCurrentOriginalCall();
+    originalCall.call();
     refreshOnGameRestart();
 }
 
@@ -1114,39 +1122,39 @@ public:
 
         if (enableStreamingFix)
         {
-            hookCall<0x408D43>(AddToLoadedVehiclesListHooked<0x408D43>, "CStreaming::AddToLoadedVehiclesList"); //CStreaming::FinishLoadingLargeFile
-            hookCall<0x40C858>(AddToLoadedVehiclesListHooked<0x40C858>, "CStreaming::AddToLoadedVehiclesList"); //CStreaming::ConvertBufferToObject
+            hookSharedCall<0x408D43, AddToLoadedVehiclesListHooked>("CStreaming::AddToLoadedVehiclesList"); //CStreaming::FinishLoadingLargeFile
+            hookSharedCall<0x40C858, AddToLoadedVehiclesListHooked>("CStreaming::AddToLoadedVehiclesList"); //CStreaming::ConvertBufferToObject
         }
         else
             Log::Write("Streaming fix disabled.\n");
 
-        hookCall<0x440840>(InteriorManager_c__UpdateHooked<0x440840>, "InteriorManager_c::Update"); //CEntryExit::TransitionFinished
-        hookCall<0x40E37B>(RetryLoadFileHooked<0x40E37B>, "CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
-        hookCall<0x440F89>(TransitionFinishedHooked<0x440F89>, "CEntryExit::TransitionFinished"); //CEntryExitManager::Update
-        hookCall<0x53E293>(CPopCycle__DisplayHooked<0x53E293>, "CPopCycle::Display"); //Render2dStuff
-        hookCall<0x489955>(CTimer__SuspendHooked<0x489955>, "CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
+        hookSharedCall<0x440840, InteriorManager_c__UpdateHooked>("InteriorManager_c::Update"); //CEntryExit::TransitionFinished
+        hookSharedCall<0x40E37B, RetryLoadFileHooked>("CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
+        hookSharedCall<0x440F89, TransitionFinishedHooked>("CEntryExit::TransitionFinished"); //CEntryExitManager::Update
+        hookSharedCall<0x53E293, CPopCycle__DisplayHooked>("CPopCycle::Display"); //Render2dStuff
+        hookSharedCall<0x489955, CTimer__SuspendHooked>("CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
 
         //CFileLoader::LoadObjectTypes
-        hookCall<0x5B85DD>(FileLoaderLoadObject<0x5B85DD>, "CFileLoader::LoadObject");
-        hookCall<0x5B862C>(FileLoaderLoadObject<0x5B862C>, "CFileLoader::LoadTimeObject");
-        hookCall<0x5B8634>(FileLoaderLoadObject<0x5B8634>, "CFileLoader::LoadWeaponObject");
-        hookCall<0x5B863C>(FileLoaderLoadObject<0x5B863C>, "CFileLoader::LoadClumpObject");
-        hookCall<0x5B8644>(FileLoaderLoadObject<0x5B8644>, "CFileLoader::LoadAnimatedClumpObject");
-        hookCall<0x5B864C>(FileLoaderLoadObject<0x5B864C>, "CFileLoader::LoadVehicleObject");
-        hookCall<0x5B8654>(FileLoaderLoadObject<0x5B8654>, "CFileLoader::LoadPedObject");
+        hookSharedCall<0x5B85DD, FileLoaderLoadObject>("CFileLoader::LoadObject");
+        hookSharedCall<0x5B862C, FileLoaderLoadObject>("CFileLoader::LoadTimeObject");
+        hookSharedCall<0x5B8634, FileLoaderLoadObject>("CFileLoader::LoadWeaponObject");
+        hookSharedCall<0x5B863C, FileLoaderLoadObject>("CFileLoader::LoadClumpObject");
+        hookSharedCall<0x5B8644, FileLoaderLoadObject>("CFileLoader::LoadAnimatedClumpObject");
+        hookSharedCall<0x5B864C, FileLoaderLoadObject>("CFileLoader::LoadVehicleObject");
+        hookSharedCall<0x5B8654, FileLoaderLoadObject>("CFileLoader::LoadPedObject");
 
-        hookCall<0x40F716>(RemoveTrianglePlanesHooked<0x40F716>, "CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
-        hookCall<0x40F9F1>(RemoveTrianglePlanesHooked<0x40F9F1>, "CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
-        //hookCall<0x4185AF>(RemoveTrianglePlanesHooked<0x4185AF>, "CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
+        hookSharedCall<0x40F716, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
+        hookSharedCall<0x40F9F1, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
+        //hookSharedCall<0x4185AF, &RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
         if (isGameHOODLUM())
-            hookCall<0x156FB57>(RemoveTrianglePlanesHooked<0x156FB57>, "CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+            hookSharedCall<0x156FB57, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
         else
-            hookCall<0x40F0E7>(RemoveTrianglePlanesHooked<0x40F0E7>, "CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+            hookSharedCall<0x40F0E7, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
 
-        hookCall<0x53E981>(CGame__ProcessHooked<0x53E981>, "CGame::Process"); //Idle
-        hookCall<0x748E6B>(CGame__ShutdownHooked<0x748E6B>, "CGame::Shutdown"); //WinMain
-        hookCall<0x748CFB>(InitialiseGameHooked<0x748CFB>, "InitialiseGame"); //WinMain
-        hookCall<0x5BF3A1>(InitialiseRenderWareHooked<0x5BF3A1>, "CGame::InitialiseRenderWare"); //RwInitialize
-        hookCall<0x53C6DB>(ReInitGameObjectVariablesHooked<0x53C6DB>, "CGame::ReInitGameObjectVariables"); //CGame::InitialiseWhenRestarting
+        hookSharedCall<0x53E981, CGame__ProcessHooked>("CGame::Process"); //Idle
+        hookSharedCall<0x748E6B, CGame__ShutdownHooked>("CGame::Shutdown"); //WinMain
+        hookSharedCall<0x748CFB, InitialiseGameHooked>("InitialiseGame"); //WinMain
+        hookSharedCall<0x5BF3A1, InitialiseRenderWareHooked>("CGame::InitialiseRenderWare"); //RwInitialize
+        hookSharedCall<0x53C6DB, ReInitGameObjectVariablesHooked>("CGame::ReInitGameObjectVariables"); //CGame::InitialiseWhenRestarting
     }
 } modelVariations;

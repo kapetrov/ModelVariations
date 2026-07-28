@@ -335,17 +335,18 @@ void PedWeaponVariations::LogDataFile()
 ///////////////////////////////////////////  CALL HOOKS    ////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <std::uintptr_t address>
-CPed* __fastcall CPedHooked(CPed* ped, void*, int pedType)
+__declspec(noinline) CPed* __fastcall CPedHooked(CPed* ped, void*, int pedType)
 {
-    CPed* retVal = callMethodOriginalAndReturn<CPed*, address>(ped, pedType);
+    const auto originalCall = captureCurrentOriginalCall();
+    CPed* retVal = originalCall.callMethodAndReturn<CPed*>(ped, pedType);
     pedWepStack.push(ped);
     return retVal;
 }
 
-template <std::uintptr_t address>
-void __fastcall GiveWeaponAtStartOfFightHooked(CPed* ped)
+__declspec(noinline) void __fastcall GiveWeaponAtStartOfFightHooked(CPed* ped)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (ped && ped->m_nCreatedBy != 2 && ped->m_aWeapons[ped->m_nSelectedWepSlot].m_eWeaponType == WEAPONTYPE_UNARMED)
         switch (ped->m_nPedType)
         {
@@ -353,17 +354,18 @@ void __fastcall GiveWeaponAtStartOfFightHooked(CPed* ped)
             case PED_TYPE_PROSTITUTE:
                 for (auto& i : weaponWatchers)
                     if (i.first == ped)
-                        return callMethodOriginal<address>(ped);
+                        return originalCall.callMethod(ped);
                 
                 pedWepStack.push(ped);
         }
 
-    return callMethodOriginal<address>(ped);
+    return originalCall.callMethod(ped);
 }
 
-template <std::uintptr_t address>
-int __fastcall GiveWeaponHooked(CPed* ped, void*, int weaponID, int ammo, int a4)
+__declspec(noinline) int __fastcall GiveWeaponHooked(CPed* ped, void*, int weaponID, int ammo, int a4)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     for (auto it = weaponWatchers.begin();it != weaponWatchers.end();)
     {
         if (it->first == ped)
@@ -384,13 +386,13 @@ int __fastcall GiveWeaponHooked(CPed* ped, void*, int weaponID, int ammo, int a4
             it++;
     }
 
-    return callMethodOriginalAndReturn<int, address>(ped, weaponID, ammo, a4);
+    return originalCall.callMethodAndReturn<int>(ped, weaponID, ammo, a4);
 }
 
-template <std::uintptr_t address>
-int16_t __fastcall CollectParametersHooked(void* _this, void*, unsigned __int16 a2)
+__declspec(noinline) int16_t __fastcall CollectParametersHooked(void* _this, void*, unsigned __int16 a2)
 {
-    auto retVal = callMethodOriginalAndReturn<int16_t, address>(_this, a2);
+    const auto originalCall = captureCurrentOriginalCall();
+    auto retVal = originalCall.callMethodAndReturn<int16_t>(_this, a2);
 
     if (!ScriptParams[1])
         return retVal;
@@ -413,8 +415,7 @@ int16_t __fastcall CollectParametersHooked(void* _this, void*, unsigned __int16 
     return retVal;
 }
 
-template <std::uintptr_t address>
-bool __fastcall DoWeHaveWeaponAvailableHooked(CPed* ped, void*, eWeaponType weapId)
+__declspec(noinline) bool __fastcall DoWeHaveWeaponAvailableHooked(CPed* ped, void*, eWeaponType weapId)
 {
     if (!IsPedPointerValid(ped))
         return false;
@@ -433,14 +434,14 @@ bool __fastcall DoWeHaveWeaponAvailableHooked(CPed* ped, void*, eWeaponType weap
 
 void PedWeaponVariations::InstallHooks()
 {
-    hookCall<0x5DDB92>(CPedHooked<0x5DDB92>, "CPed::CPed"); //CCivilianPed::CCivilianPed
-    hookCall<0x5DDC81>(CPedHooked<0x5DDC81>, "CPed::CPed"); //CCop::CCop
-    hookCall<0x5DE362>(CPedHooked<0x5DE362>, "CPed::CPed"); //CEmergencyPed::CEmergencyPed
+    hookSharedCall<0x5DDB92, CPedHooked>("CPed::CPed"); //CCivilianPed::CCivilianPed
+    hookSharedCall<0x5DDC81, CPedHooked>("CPed::CPed"); //CCop::CCop
+    hookSharedCall<0x5DE362, CPedHooked>("CPed::CPed"); //CEmergencyPed::CEmergencyPed
 
-    hookCall<0x62A12E>(GiveWeaponAtStartOfFightHooked<0x62A12E>, "CPed::GiveWeaponAtStartOfFight"); //CTaskSimpleFightingControl::ProcessPed
-    hookCall<0x47D335>(GiveWeaponHooked<0x47D335>, "CPed::GiveWeapon"); //01B2: GIVE_WEAPON_TO_CHAR
-    hookCall<0x47D4AC>(CollectParametersHooked<0x47D4AC>, "CRunningScript::CollectParameters"); //01B9: SET_CURRENT_CHAR_WEAPON
-    hookCall<0x48AE9E>(CollectParametersHooked<0x48AE9E>, "CRunningScript::CollectParameters"); //0491: HAS_CHAR_GOT_WEAPON
-    hookCall<0x68BBA0>(DoWeHaveWeaponAvailableHooked<0x68BBA0>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
-    hookCall<0x68BB32>(DoWeHaveWeaponAvailableHooked<0x68BB32>, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
+    hookSharedCall<0x62A12E, GiveWeaponAtStartOfFightHooked>("CPed::GiveWeaponAtStartOfFight"); //CTaskSimpleFightingControl::ProcessPed
+    hookSharedCall<0x47D335, GiveWeaponHooked>("CPed::GiveWeapon"); //01B2: GIVE_WEAPON_TO_CHAR
+    hookSharedCall<0x47D4AC, CollectParametersHooked>("CRunningScript::CollectParameters"); //01B9: SET_CURRENT_CHAR_WEAPON
+    hookSharedCall<0x48AE9E, CollectParametersHooked>("CRunningScript::CollectParameters"); //0491: HAS_CHAR_GOT_WEAPON
+    hookCall<0x68BBA0>(DoWeHaveWeaponAvailableHooked, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
+    hookCall<0x68BB32>(DoWeHaveWeaponAvailableHooked, "CPed::DoWeHaveWeaponAvailable"); //CTaskComplexPolicePursuit::SetWeapon
 }

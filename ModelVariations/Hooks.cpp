@@ -36,6 +36,8 @@ namespace {
     }
 }
 
+SharedCallHookState* currentSharedCallHook = nullptr;
+
 std::span<const hookinfo> getHookedCalls() noexcept
 {
     return { hookedCalls.data(), hookedCallCount };

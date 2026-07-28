@@ -5,6 +5,7 @@
 #include <set>
 #include <span>
 #include <type_traits>
+#include <utility>
 
 
 #include <injector/assembly.hpp>
@@ -38,6 +39,100 @@ struct OriginalHookSlot {
     static inline void* function = nullptr;
 };
 
+struct SharedCallHookState {
+    std::uintptr_t address;
+    void* originalFunction;
+};
+
+extern SharedCallHookState* currentSharedCallHook;
+
+template <std::uintptr_t address>
+struct SharedCallHookSlot {
+    static inline SharedCallHookState state{ address, nullptr };
+};
+
+struct CapturedOriginalCall {
+    std::uintptr_t address;
+    void* function;
+
+    template <typename... Args>
+    void call(Args... args) const
+    {
+        if (function)
+            reinterpret_cast<void(__cdecl*)(Args...)>(function)(args...);
+        else
+            logMissingOriginalFunction(address);
+    }
+
+    template <typename Ret, typename... Args>
+    Ret callAndReturn(Args... args) const
+    {
+        if (function)
+            return reinterpret_cast<Ret(__cdecl*)(Args...)>(function)(args...);
+
+        logMissingOriginalFunction(address);
+        return Ret{};
+    }
+
+    template <typename C, typename... Args>
+    void callMethod(C _this, Args... args) const
+    {
+        if (function)
+            reinterpret_cast<void(__thiscall*)(C, Args...)>(function)(_this, args...);
+        else
+            logMissingOriginalMethod(address);
+    }
+
+    template <typename Ret, typename C, typename... Args>
+    Ret callMethodAndReturn(C _this, Args... args) const
+    {
+        if (function)
+            return reinterpret_cast<Ret(__thiscall*)(C, Args...)>(function)(_this, args...);
+
+        logMissingOriginalMethod(address);
+        return Ret{};
+    }
+};
+
+inline CapturedOriginalCall captureCurrentOriginalCall() noexcept
+{
+    if (currentSharedCallHook)
+        return { currentSharedCallHook->address, currentSharedCallHook->originalFunction };
+
+    return {};
+}
+
+template <std::uintptr_t address, auto Target, typename Signature = decltype(Target)>
+struct GeneratedCallThunk;
+
+template <std::uintptr_t address, auto Target, typename Ret, typename... Args>
+struct GeneratedCallThunk<address, Target, Ret(__cdecl*)(Args...)> {
+    static Ret __cdecl invoke(Args... args)
+    {
+        currentSharedCallHook = &SharedCallHookSlot<address>::state;
+        return Target(std::forward<Args>(args)...);
+    }
+};
+
+template <std::uintptr_t address, auto Target, typename Ret, typename... Args>
+struct GeneratedCallThunk<address, Target, Ret(__fastcall*)(Args...)> {
+    static Ret __fastcall invoke(Args... args)
+    {
+        currentSharedCallHook = &SharedCallHookSlot<address>::state;
+        return Target(std::forward<Args>(args)...);
+    }
+};
+
+template <std::uintptr_t address, auto Target>
+void hookSharedCall(const char* name, bool isVTableAddress = false)
+{
+    using Thunk = GeneratedCallThunk<address, Target>;
+
+    void* changedFunction = reinterpret_cast<void*>(&Thunk::invoke);
+    if (void* originalFunction = hookCallImpl(address, changedFunction, name, isVTableAddress))
+        SharedCallHookSlot<address>::state.originalFunction = originalFunction;
+}
+
 template <std::uintptr_t address, typename Function>
 void hookCall(Function pFunction, const char* name, bool isVTableAddress = false)
 {
@@ -46,45 +141,4 @@ void hookCall(Function pFunction, const char* name, bool isVTableAddress = false
     void* changedFunction = reinterpret_cast<void*>(pFunction);
     if (void* originalFunction = hookCallImpl(address, changedFunction, name, isVTableAddress))
         OriginalHookSlot<address>::function = originalFunction;
-}
-
-template <std::uintptr_t address, typename... Args>
-void callOriginal(Args... args)
-{
-    if (void* originalFunction = OriginalHookSlot<address>::function)
-        reinterpret_cast<void(__cdecl*)(Args...)>(originalFunction)(args...);
-    else
-        logMissingOriginalFunction(address);
-}
-
-template <typename Ret, std::uintptr_t address, typename... Args>
-Ret callOriginalAndReturn(Args... args)
-{
-    if (void* originalFunction = OriginalHookSlot<address>::function)
-        return reinterpret_cast<Ret(__cdecl*)(Args...)>(originalFunction)(args...);
-    else
-        logMissingOriginalFunction(address);
-
-    return Ret{};
-}
-
-
-template <std::uintptr_t address, typename C, typename... Args>
-void callMethodOriginal(C _this, Args... args)
-{
-    if (void* originalFunction = OriginalHookSlot<address>::function)
-        reinterpret_cast<void(__thiscall*)(C, Args...)>(originalFunction)(_this, args...);
-    else
-        logMissingOriginalMethod(address);
-}
-
-template <typename Ret, std::uintptr_t address, typename C, typename... Args>
-Ret callMethodOriginalAndReturn(C _this, Args... args)
-{
-    if (void* originalFunction = OriginalHookSlot<address>::function)
-        return reinterpret_cast<Ret(__thiscall*)(C, Args...)>(originalFunction)(_this, args...);
-    else
-        logMissingOriginalMethod(address);
-
-    return Ret{};
 }

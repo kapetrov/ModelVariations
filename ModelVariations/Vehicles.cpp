@@ -1417,10 +1417,10 @@ void VehicleVariations::LogVariations()
 ///////////////////////////////////////////  CALL HOOKS    ////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <std::uintptr_t address>
-int __cdecl ChooseModelHooked(int* a1)
+__declspec(noinline) int __cdecl ChooseModelHooked(int* a1)
 {
-    const int model = callOriginalAndReturn<int, address>(a1);
+    const auto originalCall = captureCurrentOriginalCall();
+    const int model = originalCall.callAndReturn<int>(a1);
 
     if (model < 400)
         return model;
@@ -1435,10 +1435,10 @@ int __cdecl ChooseModelHooked(int* a1)
     return retVal;
 }
 
-template <std::uintptr_t address>
-int __cdecl ChoosePoliceCarModelHooked(int a1)
+__declspec(noinline) int __cdecl ChoosePoliceCarModelHooked(int a1)
 {
-    const int model = callOriginalAndReturn<int, address>(a1);
+    const auto originalCall = captureCurrentOriginalCall();
+    const int model = originalCall.callAndReturn<int>(a1);
 
     if (model < 427 || model > 601)
         return model;
@@ -1453,9 +1453,10 @@ int __cdecl ChoosePoliceCarModelHooked(int a1)
     return retVal;
 }
 
-template <std::uintptr_t address>
-void __cdecl AddPoliceCarOccupantsHooked(CVehicle* a2, char a3)
+__declspec(noinline) void __cdecl AddPoliceCarOccupantsHooked(CVehicle* a2, char a3)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (a2 == NULL)
         return;
 
@@ -1464,7 +1465,7 @@ void __cdecl AddPoliceCarOccupantsHooked(CVehicle* a2, char a3)
     const unsigned short model = a2->m_nModelIndex;
     a2->m_nModelIndex = (unsigned short)getVariationOriginalModel(a2->m_nModelIndex);
 
-    callOriginal<address>(a2, a3);
+    originalCall.call(a2, a3);
 
     a2->m_nModelIndex = model;
 
@@ -1472,19 +1473,20 @@ void __cdecl AddPoliceCarOccupantsHooked(CVehicle* a2, char a3)
     currentOccupantsModel = 0;
 }
 
-template <std::uintptr_t address>
-CAutomobile* __fastcall CAutomobileHooked(CAutomobile* automobile, void*, int modelIndex, char usageType, char bSetupSuspensionLines)
+__declspec(noinline) CAutomobile* __fastcall CAutomobileHooked(CAutomobile* automobile, void*, int modelIndex, char usageType, char bSetupSuspensionLines)
 {
-    return callMethodOriginalAndReturn<CAutomobile*, address>(automobile, getRandomVariation(modelIndex), usageType, bSetupSuspensionLines);
+    const auto originalCall = captureCurrentOriginalCall();
+    return originalCall.callMethodAndReturn<CAutomobile*>(automobile, getRandomVariation(modelIndex), usageType, bSetupSuspensionLines);
 }
 
-template <std::uintptr_t address>
-int __fastcall PickRandomCarHooked(CLoadedCarGroup* cargrp, void*, char a2, char a3) //for random parked cars
+__declspec(noinline) int __fastcall PickRandomCarHooked(CLoadedCarGroup* cargrp, void*, char a2, char a3) //for random parked cars
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (cargrp == NULL)
         return -1;
 
-    int variation = getRandomVariation(callMethodOriginalAndReturn<int, address>(cargrp, a2, a3), true);
+    int variation = getRandomVariation(originalCall.callMethodAndReturn<int>(cargrp, a2, a3), true);
     if (variation > 0 && CStreamingInfo__ms_pArrayBase[variation].m_nLoadState != LOADSTATE_LOADED)
     {
         Log::Write("PickRandomCarHooked Error! Model %d is not loaded.\n", variation);
@@ -1494,16 +1496,17 @@ int __fastcall PickRandomCarHooked(CLoadedCarGroup* cargrp, void*, char a2, char
     return variation;
 }
 
-template <std::uintptr_t address>
-void __fastcall DoInternalProcessingHooked(CCarGenerator* park) //for non-random parked cars
+__declspec(noinline) void __fastcall DoInternalProcessingHooked(CCarGenerator* park) //for non-random parked cars
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (park == NULL)
         return;
 
     if (park->m_nModelId < 0) //We're tuning only random cars
     {
         tuneParkedCar = true;
-        callMethodOriginal<address>(park);
+        originalCall.callMethod(park);
         tuneParkedCar = false;
         return;
     }
@@ -1528,7 +1531,7 @@ void __fastcall DoInternalProcessingHooked(CCarGenerator* park) //for non-random
                 {
                     const auto value = injector::ReadMemory<uint16_t>(hdAddress, true);
                     Log::LogModifiedAddress(hdAddress, "Modified address detected: 0x%08X is %u\n", hdAddress, value);
-                    callMethodOriginal<address>(park);
+                    originalCall.callMethod(park);
                     return;
                 }
 
@@ -1539,13 +1542,13 @@ void __fastcall DoInternalProcessingHooked(CCarGenerator* park) //for non-random
             for (auto hdAddress : hotdogAddresses)
                 WriteMemory<uint16_t>(hdAddress, park->m_nModelId);
 
-            callMethodOriginal<address>(park);
+            originalCall.callMethod(park);
 
             for (std::size_t i = 0; i < hotdogAddresses.size(); ++i)
                 WriteMemory<uint16_t>(hotdogAddresses[i], originalHotdogModels[i]);
         }
         else
-            callMethodOriginal<address>(park);
+            originalCall.callMethod(park);
 
         return;
     }
@@ -1572,33 +1575,34 @@ void __fastcall DoInternalProcessingHooked(CCarGenerator* park) //for non-random
             park->m_nModelId = (short)getRandomVariation(park->m_nModelId, true);
             [[fallthrough]];
         default:
-            callMethodOriginal<address>(park);
+            originalCall.callMethod(park);
     }
 }
 
-template <std::uintptr_t address>
-void* __fastcall CTrainHooked(void* train, void*, int modelIndex, int createdBy)
+__declspec(noinline) void* __fastcall CTrainHooked(void* train, void*, int modelIndex, int createdBy)
 {
-    return callMethodOriginalAndReturn<void*, address>(train, CTheScripts__IsPlayerOnAMission() ? modelIndex : getRandomVariation(modelIndex), createdBy);
+    const auto originalCall = captureCurrentOriginalCall();
+    return originalCall.callMethodAndReturn<void*>(train, CTheScripts__IsPlayerOnAMission() ? modelIndex : getRandomVariation(modelIndex), createdBy);
 }
 
-template <std::uintptr_t address>
-CVehicle* __fastcall CBoatHooked(void* boat, void*, int modelId, char a3)
+__declspec(noinline) CVehicle* __fastcall CBoatHooked(void* boat, void*, int modelId, char a3)
 {
-    return callMethodOriginalAndReturn<CVehicle*, address>(boat, getRandomVariation(modelId), a3);
+    const auto originalCall = captureCurrentOriginalCall();
+    return originalCall.callMethodAndReturn<CVehicle*>(boat, getRandomVariation(modelId), a3);
 }
 
-template <std::uintptr_t address>
-CAutomobile* __fastcall CHeliHooked(CHeli* heli, void*, int a2, char usageType)
+__declspec(noinline) CAutomobile* __fastcall CHeliHooked(CHeli* heli, void*, int a2, char usageType)
 {
-    return callMethodOriginalAndReturn<CAutomobile*, address>(heli, getRandomVariation(a2), usageType);
+    const auto originalCall = captureCurrentOriginalCall();
+    return originalCall.callMethodAndReturn<CAutomobile*>(heli, getRandomVariation(a2), usageType);
 }
 
-template <std::uintptr_t address>
-CHeli* __cdecl GenerateHeliHooked(CPed* ped, char newsHeli)
+__declspec(noinline) CHeli* __cdecl GenerateHeliHooked(CPed* ped, char newsHeli)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (FindPlayerWanted(-1)->m_nWantedLevel < 4)
-        return callOriginalAndReturn<CHeli*, address>(ped, 0);
+        return originalCall.callAndReturn<CHeli*>(ped, 0);
 
     if (CHeli::pHelis)
     {
@@ -1615,32 +1619,34 @@ CHeli* __cdecl GenerateHeliHooked(CPed* ped, char newsHeli)
             Log::Write("Error loading vehicle model %d (%s) %s\n", heliModel, modelNames.contains(heliModel) ? modelNames[heliModel].c_str() : "", getLoadStateString(loadState).c_str());
     }
 
-    return callOriginalAndReturn<CHeli*, address>(ped, newsHeli);
+    return originalCall.callAndReturn<CHeli*>(ped, newsHeli);
 }
 
-template <std::uintptr_t address>
-CPlane* __fastcall CPlaneHooked(CPlane* plane, void*, int a2, char a3)
+__declspec(noinline) CPlane* __fastcall CPlaneHooked(CPlane* plane, void*, int a2, char a3)
 {
-    return callMethodOriginalAndReturn<CPlane*, address>(plane, getRandomVariation(a2), a3);
+    const auto originalCall = captureCurrentOriginalCall();
+    return originalCall.callMethodAndReturn<CPlane*>(plane, getRandomVariation(a2), a3);
 }
 
-template <std::uintptr_t address>
-bool __fastcall IsLawEnforcementVehicleHooked(CVehicle* veh)
+__declspec(noinline) bool __fastcall IsLawEnforcementVehicleHooked(CVehicle* veh)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (veh == NULL)
         return false;
 
     const unsigned short modelIndex = veh->m_nModelIndex;
     veh->m_nModelIndex = (unsigned short)getVariationOriginalModel(veh->m_nModelIndex);
-    bool isLawEnforcement = callMethodOriginalAndReturn<bool, address>(veh);
+    bool isLawEnforcement = originalCall.callMethodAndReturn<bool>(veh);
     veh->m_nModelIndex = modelIndex;
 
     return isLawEnforcement;
 }
 
-template <std::uintptr_t address>
-char __cdecl GenerateRoadBlockCopsForCarHooked(CVehicle* a1, int pedsPositionsType, int type)
+__declspec(noinline) char __cdecl GenerateRoadBlockCopsForCarHooked(CVehicle* a1, int pedsPositionsType, int type)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (a1 == NULL)
         return 0;
 
@@ -1648,7 +1654,7 @@ char __cdecl GenerateRoadBlockCopsForCarHooked(CVehicle* a1, int pedsPositionsTy
 
     roadblockModel = a1->m_nModelIndex;
     a1->m_nModelIndex = (unsigned short)getVariationOriginalModel(a1->m_nModelIndex);
-    callOriginal<address>(a1, pedsPositionsType, type);
+    originalCall.call(a1, pedsPositionsType, type);
     if (roadblockModel >= 400)
         a1->m_nModelIndex = roadblockModel;
     roadblockModel = 0;
@@ -1658,21 +1664,23 @@ char __cdecl GenerateRoadBlockCopsForCarHooked(CVehicle* a1, int pedsPositionsTy
     return 1;
 }
 
-template <std::uintptr_t address>
-CColModel* __fastcall GetColModelHooked(CVehicle* entity)
+__declspec(noinline) CColModel* __fastcall GetColModelHooked(CVehicle* entity)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (roadblockModel >= 400)
         entity->m_nModelIndex = roadblockModel;
-    return callMethodOriginalAndReturn<CColModel*, address>(entity);
+    return originalCall.callMethodAndReturn<CColModel*>(entity);
 }
 
-template <std::uintptr_t address>
-int __cdecl GetDefaultCopModelHooked()
+__declspec(noinline) int __cdecl GetDefaultCopModelHooked()
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (roadblockDriver > 0)
         return roadblockDriver;
 
-    auto retVal = callOriginalAndReturn<int, address>();
+    auto retVal = originalCall.callAndReturn<int>();
 
     if (retVal == 0)
     {
@@ -1690,9 +1698,10 @@ int __cdecl GetDefaultCopModelHooked()
     return retVal;
 }
 
-template <std::uintptr_t address>
-CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int copType)
+__declspec(noinline) CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int copType)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     static constexpr std::array<std::uintptr_t, 4> modelAddresses = {
         0x5DDE4F, 0x5DDD8F, 0x5DDDCF, 0x5DDE0F
     };
@@ -1701,7 +1710,7 @@ CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int copType)
         if (!memoryMatchesOriginalExe(modelAddress, 5) && !forceEnableGlobal && !forceEnable.contains(modelAddress))
         {
             Log::LogModifiedAddress(modelAddress, "Modified address detected: 0x%08X is %u\n", modelAddress, *(uint16_t*)(modelAddress + 1));
-            return callMethodOriginalAndReturn<CCopPed*, address>(ped, copType);
+            return originalCall.callMethodAndReturn<CCopPed*>(ped, copType);
         }
 
     unsigned int original283 = *(unsigned int*)0x5DDE50;
@@ -1718,7 +1727,7 @@ CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int copType)
             {
                 Log::Write("Error loading ped model %d (%s) %s\n", driver, modelNames.contains(driver) ? modelNames[driver].c_str() : "", getLoadStateString(loadState).c_str());
                 roadblockDriver = 0;
-                return callMethodOriginalAndReturn<CCopPed*, address>(ped, copType);
+                return originalCall.callMethodAndReturn<CCopPed*>(ped, copType);
             }
 
             switch (getVariationOriginalModel(currentOccupantsModel))
@@ -1762,7 +1771,7 @@ CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int copType)
         }
     }
 
-    auto retVal = callMethodOriginalAndReturn<CCopPed*, address>(ped, copType);
+    auto retVal = originalCall.callMethodAndReturn<CCopPed*>(ped, copType);
     WriteMemory<unsigned int>(0x5DDE50, original283);
     WriteMemory<unsigned int>(0x5DDD90, original285);
     WriteMemory<unsigned int>(0x5DDDD0, original286);
@@ -1771,9 +1780,10 @@ CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int copType)
     return retVal;
 }
 
-template <std::uintptr_t address>
-CPed* __cdecl AddPedInCarHooked(CVehicle* veh, char driver, int a3, int a4, char a5, char a6)
+__declspec(noinline) CPed* __cdecl AddPedInCarHooked(CVehicle* veh, char driver, int a3, int a4, char a5, char a6)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (veh == NULL)
         return NULL;
 
@@ -1808,15 +1818,16 @@ CPed* __cdecl AddPedInCarHooked(CVehicle* veh, char driver, int a3, int a4, char
 
     const auto model = veh->m_nModelIndex;
     veh->m_nModelIndex = (unsigned short)getVariationOriginalModel(veh->m_nModelIndex);
-    CPed* ped = callOriginalAndReturn<CPed*, address>(veh, driver, a3, a4, a5, a6);
+    CPed* ped = originalCall.callAndReturn<CPed*>(veh, driver, a3, a4, a5, a6);
     veh->m_nModelIndex = model;
 
     return ped;
 }
 
-template <std::uintptr_t address>
-CPed* __cdecl AddPedHooked(unsigned int pedType, int modelIndex, CVector* posn, bool unknown)
+__declspec(noinline) CPed* __cdecl AddPedHooked(unsigned int pedType, int modelIndex, CVector* posn, bool unknown)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (occupantModelIndex > 0)
     {
         if (auto loadState = loadModel(occupantModelIndex, PRIORITY_REQUEST, true); loadState == LOADSTATE_LOADED)
@@ -1832,7 +1843,7 @@ CPed* __cdecl AddPedHooked(unsigned int pedType, int modelIndex, CVector* posn, 
         else
             Log::Write("Error loading ped model %d (%s) %s\n", occupantModelIndex, modelNames.contains((unsigned short)occupantModelIndex) ? modelNames[(unsigned short)occupantModelIndex].c_str() : "", getLoadStateString(loadState).c_str());
 
-        CPed* ped = callOriginalAndReturn<CPed*, address>(pedType, modelIndex, posn, unknown);
+        CPed* ped = originalCall.callAndReturn<CPed*>(pedType, modelIndex, posn, unknown);
         occupantModelIndex = -1;
         return ped;
     }
@@ -1851,30 +1862,31 @@ CPed* __cdecl AddPedHooked(unsigned int pedType, int modelIndex, CVector* posn, 
             Log::Write("FAILED\n");
     }
 
-    return callOriginalAndReturn<CPed*, address>(pedType, modelIndex, posn, unknown);
+    return originalCall.callAndReturn<CPed*>(pedType, modelIndex, posn, unknown);
 }
 
-template <std::uintptr_t address>
-void __cdecl SetUpDriverAndPassengersForVehicleHooked(CVehicle* car, int a3, int a4, char a5, char a6, int a7)
+__declspec(noinline) void __cdecl SetUpDriverAndPassengersForVehicleHooked(CVehicle* car, int a3, int a4, char a5, char a6, int a7)
 {
+    const auto originalCall = captureCurrentOriginalCall();
     processOccupantGroups(car);
-    callOriginal<address>(car, a3, a4, a5, a6, a7);
+    originalCall.call(car, a3, a4, a5, a6, a7);
     currentOccupantsGroup = -1;
     currentOccupantsModel = 0;
 }
 
-template <std::uintptr_t address>
-void __cdecl AddAmbulanceOccupantsHooked(CVehicle* a1)
+__declspec(noinline) void __cdecl AddAmbulanceOccupantsHooked(CVehicle* a1)
 {
+    const auto originalCall = captureCurrentOriginalCall();
     processOccupantGroups(a1);
-    callOriginal<address>(a1);
+    originalCall.call(a1);
     currentOccupantsGroup = -1;
     currentOccupantsModel = 0;
 }
 
-template <std::uintptr_t address>
-void __cdecl PossiblyRemoveVehicleHooked(CVehicle* car) 
+__declspec(noinline) void __cdecl PossiblyRemoveVehicleHooked(CVehicle* car)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (car == NULL)
         return;
 
@@ -1916,7 +1928,7 @@ void __cdecl PossiblyRemoveVehicleHooked(CVehicle* car)
         it++;
     }
 
-    callOriginal<address>(car);
+    originalCall.call(car);
 
     if (!trailersToCheck.empty())
         if (!IsVehiclePointerValid(car) || (IsVehiclePointerValid(car) && car->bFadeOut))
@@ -1932,23 +1944,25 @@ void __cdecl PossiblyRemoveVehicleHooked(CVehicle* car)
         }
 }
 
-template <std::uintptr_t address>
-void* __fastcall SetDriverHooked(CVehicle* _this, void*, CPed* a2)
+__declspec(noinline) void* __fastcall SetDriverHooked(CVehicle* _this, void*, CPed* a2)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (_this == NULL)
         return NULL;
 
     unsigned short modelIndex = _this->m_nModelIndex;
     _this->m_nModelIndex = (unsigned short)getVariationOriginalModel(_this->m_nModelIndex);
-    auto retVal = callMethodOriginalAndReturn<void*, address>(_this, a2);
+    auto retVal = originalCall.callMethodAndReturn<void*>(_this, a2);
     _this->m_nModelIndex = modelIndex;
 
     return retVal;
 }
 
-template <std::uintptr_t address>
-void __fastcall CAutomobile__PreRenderHooked(CAutomobile* veh)
+__declspec(noinline) void __fastcall CAutomobile__PreRenderHooked(CAutomobile* veh)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (veh == NULL)
         return;
 
@@ -1956,24 +1970,26 @@ void __fastcall CAutomobile__PreRenderHooked(CAutomobile* veh)
     lightsModel = veh->m_nModelIndex;
 
 
-    callMethodOriginal<address>(veh);
+    originalCall.callMethod(veh);
     veh->m_nModelIndex = originalModel;
     lightsModel = 0;
 }
 
-template <std::uintptr_t address>
-int __fastcall GetVehicleAppearanceHooked(CVehicle* veh)
+__declspec(noinline) int __fastcall GetVehicleAppearanceHooked(CVehicle* veh)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (lightsModel > 0)
         veh->m_nModelIndex = lightsModel;
 
     lightsModel = 0;
-    return callMethodOriginalAndReturn<int, address>(veh);
+    return originalCall.callMethodAndReturn<int>(veh);
 }
 
-template <std::uintptr_t address>
-void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
+__declspec(noinline) void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (_this->m_pVehicleStruct == NULL)
     {
         int index = -1;
@@ -1982,7 +1998,7 @@ void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
         if (mInfo == NULL || mInfo != _this)
         {
             Log::Write("Vehicle model lookup failed: this=0x%08X key=0x%08X mInfo=0x%08X index=%d\n", _this, _this->m_nKey, mInfo, index);
-            return callMethodOriginalAndReturn<void*, address>(_this);
+            return originalCall.callMethodAndReturn<void*>(_this);
         }
 
         auto &streamingInfo = CStreamingInfo__ms_pArrayBase[index];
@@ -2014,7 +2030,7 @@ void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
                 clumpLoadModel = -1;
                 Log::Write("OK\n");
                 streamingInfo.m_nFlags &= ~((uint8_t)GAME_REQUIRED);
-                return callMethodOriginalAndReturn<void*, address>(_this);
+                return originalCall.callMethodAndReturn<void*>(_this);
             }
 
             std::string errorString = 
@@ -2036,16 +2052,17 @@ void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _this)
         clumpLoadModel = -1;
     }
 
-    return callMethodOriginalAndReturn<void*, address>(_this);
+    return originalCall.callMethodAndReturn<void*>(_this);
 }
 
-template <std::uintptr_t address>
-char __cdecl LoadClumpFileHooked(void* stream, int modelIndex)
+__declspec(noinline) char __cdecl LoadClumpFileHooked(void* stream, int modelIndex)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (clumpLoadModel && clumpLoadModel == modelIndex)
         Log::Write("Called LoadClumpFileHooked with stream 0x%08X for model %d\n", stream, modelIndex);
 
-    auto retVal = callOriginalAndReturn<char, address>(stream, modelIndex);
+    auto retVal = originalCall.callAndReturn<char>(stream, modelIndex);
 
     if (clumpLoadModel && clumpLoadModel == modelIndex)
     {
@@ -2056,10 +2073,10 @@ char __cdecl LoadClumpFileHooked(void* stream, int modelIndex)
     return retVal;
 }
 
-template <std::uintptr_t address>
-CVehicle* __cdecl GetNewVehicleDependingOnCarModelHooked(int modelIndex, int createdBy)
+__declspec(noinline) CVehicle* __cdecl GetNewVehicleDependingOnCarModelHooked(int modelIndex, int createdBy)
 {
-    CVehicle* veh = callOriginalAndReturn<CVehicle*, address>(modelIndex, createdBy);
+    const auto originalCall = captureCurrentOriginalCall();
+    CVehicle* veh = originalCall.callAndReturn<CVehicle*>(modelIndex, createdBy);
     if (veh && veh->m_pRwObject == NULL)
     {
         Log::Write("GetNewVehicleDependingOnCarModelHooked Error! Vehicle 0x%X (%u) has NULL m_pRwObject. Returning NULL.\n", veh, veh->m_nModelIndex);
@@ -2070,23 +2087,24 @@ CVehicle* __cdecl GetNewVehicleDependingOnCarModelHooked(int modelIndex, int cre
     return veh;
 }
 
-template <std::uintptr_t address>
-CPhysical* __fastcall CPhysicalHooked(CVehicle* _this)
+__declspec(noinline) CPhysical* __fastcall CPhysicalHooked(CVehicle* _this)
 {
-    CPhysical* retVal = callMethodOriginalAndReturn<CPhysical*, address>(_this);
+    const auto originalCall = captureCurrentOriginalCall();
+    CPhysical* retVal = originalCall.callMethodAndReturn<CPhysical*>(_this);
     vehVars.stack.push(_this);
     return retVal;
 }
 
-template <std::uintptr_t address>
-void __fastcall AddAudioEventHooked(CAEVehicleAudioEntity* audio, void*, int audioEvent, float fVolume)
+__declspec(noinline) void __fastcall AddAudioEventHooked(CAEVehicleAudioEntity* audio, void*, int audioEvent, float fVolume)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     //https://github.com/JuniorDjjr/TruckTrailer
     if (audio)
     {
         CVehicle* vehicle = static_cast<CVehicle*>(audio->m_pEntity);
         if (vehicle && (CTimer::m_snTimeInMilliseconds - vehicle->m_nCreationTime) > 2000)
-            callMethodOriginal<address>(audio, audioEvent, fVolume);
+            originalCall.callMethod(audio, audioEvent, fVolume);
     }
 }
 
@@ -2106,28 +2124,30 @@ void CWorld__RemoveHooked_impl(CVehicle* truck)
     }
 }
 
-template <std::uintptr_t address>
-void __cdecl CWorld__RemoveHooked(CVehicle* entity)
+__declspec(noinline) void __cdecl CWorld__RemoveHooked(CVehicle* entity)
 {
+    const auto originalCall = captureCurrentOriginalCall();
     CWorld__RemoveHooked_impl(entity);
 
-    callOriginal<address>(entity);
+    originalCall.call(entity);
 }
 
-template <std::uintptr_t address>
-void __cdecl CWorld__AddHooked(CVehicle* a1)
+__declspec(noinline) void __cdecl CWorld__AddHooked(CVehicle* a1)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (tuneParkedCar)
     {
         processTuning(a1);
         tuneParkedCar = false;
     }
-    callOriginal<address>(a1);
+    originalCall.call(a1);
 }
 
-template <std::uintptr_t address>
-void* __cdecl FillFrameArrayHooked(void* clump, void* data)
+__declspec(noinline) void* __cdecl FillFrameArrayHooked(void* clump, void* data)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (!isAddressValid(clump))
     {
         Log::Write("FillFrameArrayHooked Error! clump is invalid (0x%X).\n", clump);
@@ -2140,12 +2160,13 @@ void* __cdecl FillFrameArrayHooked(void* clump, void* data)
         return NULL;
     }
 
-    return callOriginalAndReturn<void*, address>(clump, data);
+    return originalCall.callAndReturn<void*>(clump, data);
 }
 
-template <std::uintptr_t address>
-void __fastcall SetupSuspensionLinesHooked(CVehicle* _this)
+__declspec(noinline) void __fastcall SetupSuspensionLinesHooked(CVehicle* _this)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (_this == NULL)
     {
         Log::Write("SetupSuspensionLinesHooked Error! _this is NULL.\n");
@@ -2158,12 +2179,13 @@ void __fastcall SetupSuspensionLinesHooked(CVehicle* _this)
         return;
     }
 
-    callMethodOriginal<address>(_this);
+    originalCall.callMethod(_this);
 }
 
-template <std::uintptr_t address>
-void __fastcall UpdateClumpAlphaHooked(CVehicle* _this)
+__declspec(noinline) void __fastcall UpdateClumpAlphaHooked(CVehicle* _this)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (!isAddressValid(_this))
     {
         Log::Write("UpdateClumpAlphaHooked Error! _this is invalid (0x%X).\n", _this);
@@ -2176,12 +2198,13 @@ void __fastcall UpdateClumpAlphaHooked(CVehicle* _this)
         return;
     }
 
-    callMethodOriginal<address>(_this);
+    originalCall.callMethod(_this);
 }
 
-template <std::uintptr_t address>
-void __cdecl SetClumpAlphaHooked(void* a1, void* a2)
+__declspec(noinline) void __cdecl SetClumpAlphaHooked(void* a1, void* a2)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (!isAddressValid(a1))
     {
         Log::Write("SetClumpAlphaHooked Error! a1 is invalid (0x%X).\n", a1);
@@ -2194,39 +2217,42 @@ void __cdecl SetClumpAlphaHooked(void* a1, void* a2)
         return;
     }
 
-    callOriginal<address>(a1, a2);
+    originalCall.call(a1, a2);
 }
 
 //changeScriptedCars
-template <std::uintptr_t address>
-CVehicle* __cdecl CreateCarForScriptHooked(int modelId, float posX, float posY, float posZ, char doMissionCleanup)
+__declspec(noinline) CVehicle* __cdecl CreateCarForScriptHooked(int modelId, float posX, float posY, float posZ, char doMissionCleanup)
 {
-    return callOriginalAndReturn<CVehicle*, address>(getRandomVariation(modelId), posX, posY, posZ, doMissionCleanup);
+    const auto originalCall = captureCurrentOriginalCall();
+    return originalCall.callAndReturn<CVehicle*>(getRandomVariation(modelId), posX, posY, posZ, doMissionCleanup);
 }
 
 //enableSiren
-template <std::uintptr_t address>
-bool __fastcall UsesSirenHooked(CVehicle* veh)
+__declspec(noinline) bool __fastcall UsesSirenHooked(CVehicle* veh)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (veh == NULL)
         return false;
 
     const unsigned short modelIndex = veh->m_nModelIndex;
     veh->m_nModelIndex = (unsigned short)getVariationOriginalModel(veh->m_nModelIndex);
-    bool usesSiren = callMethodOriginalAndReturn<bool, address>(veh);
+    bool usesSiren = originalCall.callMethodAndReturn<bool>(veh);
     veh->m_nModelIndex = modelIndex;
 
     return usesSiren;
 }
 
 //enableLights
-template <std::uintptr_t address, bool second = false>
-void __cdecl RegisterCoronaHooked(void* _this, CEntity* a2, unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha, CVector* coors, float size,
-                                  float a9, void* texture, unsigned char a11, unsigned char a12, unsigned char a13, int a14, float a15, float a16, float a17, float a18,
-                                  float a19, float a20, bool a21)
+template <bool second = false>
+__declspec(noinline) void __cdecl RegisterCoronaHooked(void* _this, CEntity* a2, unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha, CVector* coors, 
+                                                       float size, float a9, void* texture, unsigned char a11, unsigned char a12, unsigned char a13, int a14, float a15, float a16, 
+                                                       float a17, float a18, float a19, float a20, bool a21)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (!a2 || !coors)
-        return callOriginal<address>(_this, a2, red, green, blue, alpha, coors, size, a9, texture, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21);
+        return originalCall.call(_this, a2, red, green, blue, alpha, coors, size, a9, texture, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21);
 
     //size
     {
@@ -2265,13 +2291,14 @@ void __cdecl RegisterCoronaHooked(void* _this, CEntity* a2, unsigned char red, u
         }
     }
 
-    callOriginal<address>(_this, a2, red, green, blue, alpha, coors, size, a9, texture, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21);
+    originalCall.call(_this, a2, red, green, blue, alpha, coors, size, a9, texture, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21);
 }
 
-template <std::uintptr_t address>
-void __cdecl AddLightHooked(char type, float x, float y, float z, float dir_x, float dir_y, float dir_z, float radius, float r, float g, float b,
-                            char fogType, char generateExtraShadows, int attachedTo)
+__declspec(noinline) void __cdecl AddLightHooked(char type, float x, float y, float z, float dir_x, float dir_y, float dir_z, float radius, float r, float g, float b,
+                                                 char fogType, char generateExtraShadows, int attachedTo)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (lightsModel > 0)
     {
         const auto it = vehVars.lightPositions.find(lightsModel);
@@ -2292,24 +2319,25 @@ void __cdecl AddLightHooked(char type, float x, float y, float z, float dir_x, f
             radius = it2->second;
     }
 
-    callOriginal<address>(type, x, y, z, dir_x, dir_y, dir_z, radius, r, g, b, fogType, generateExtraShadows, attachedTo);
+    originalCall.call(type, x, y, z, dir_x, dir_y, dir_z, radius, r, g, b, fogType, generateExtraShadows, attachedTo);
 }
 
-template <std::uintptr_t address>
-void __fastcall AddDamagedVehicleParticlesHooked(CVehicle* veh)
+__declspec(noinline) void __fastcall AddDamagedVehicleParticlesHooked(CVehicle* veh)
 {
-    callMethodOriginal<address>(veh);
+    const auto originalCall = captureCurrentOriginalCall();
+    originalCall.callMethod(veh);
     if (lightsModel > 0)
         veh->m_nModelIndex = (unsigned short)getVariationOriginalModel(veh->m_nModelIndex);
 }
 
 //enableTrailerLights
-template <std::uintptr_t address>
-void __fastcall DoVehicleLightsHooked(CAutomobile* _this, void*, void* m, int a3)
+__declspec(noinline) void __fastcall DoVehicleLightsHooked(CAutomobile* _this, void*, void* m, int a3)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (_this == NULL || !CModelInfo::IsTrailerModel(_this->m_nModelIndex) || getVariationOriginalModel(_this->m_nModelIndex) == 610)
     {
-        callMethodOriginal<address>(_this, m, a3);
+        originalCall.callMethod(_this, m, a3);
         return;
     }
 
@@ -2330,31 +2358,32 @@ void __fastcall DoVehicleLightsHooked(CAutomobile* _this, void*, void* m, int a3
         _this->m_pDriver = FindPlayerPed();
     }
 
-    callMethodOriginal<address>(_this, m, a3);
+    originalCall.callMethod(_this, m, a3);
     _this->m_pDriver = driverOriginal;
     _this->m_fBreakPedal = brakeOriginal;
 }
 
 //disablePayAndSpray
-template <std::uintptr_t address>
-bool __cdecl IsCarSprayableHooked(CVehicle* veh)
+__declspec(noinline) bool __cdecl IsCarSprayableHooked(CVehicle* veh)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (veh == NULL)
         return false;
 
     const unsigned short modelIndex = veh->m_nModelIndex;
     veh->m_nModelIndex = (unsigned short)getVariationOriginalModel(veh->m_nModelIndex);
-    bool isCarSprayable = callOriginalAndReturn<bool, address>(veh);
+    bool isCarSprayable = originalCall.callAndReturn<bool>(veh);
     veh->m_nModelIndex = modelIndex;
 
     return isCarSprayable;
 }
 
 //enableSideMissions
-template <std::uintptr_t address>
-CPed* __fastcall CPool__atHandleHooked(void* _this, void*, int h)
+__declspec(noinline) CPed* __fastcall CPool__atHandleHooked(void* _this, void*, int h)
 {
-    CPed* ped = callMethodOriginalAndReturn<CPed*, address>(_this, h);
+    const auto originalCall = captureCurrentOriginalCall();
+    CPed* ped = originalCall.callMethodAndReturn<CPed*>(_this, h);
     if (IsPedPointerValid(ped) && IsVehiclePointerValid(ped->m_pVehicle))
     {
         auto originalModel = getVariationOriginalModel(ped->m_pVehicle->m_nModelIndex);
@@ -2364,13 +2393,13 @@ CPed* __fastcall CPool__atHandleHooked(void* _this, void*, int h)
     return ped;
 }
 
-template <std::uintptr_t address>
-CPed* __fastcall CPool__atHandleTaxiHooked(void* _this, void*, int h) //Unnecessarily complicated function to avoid incompatibility with FLA
+__declspec(noinline) CPed* __fastcall CPool__atHandleTaxiHooked(void* _this, void*, int h) //Unnecessarily complicated function to avoid incompatibility with FLA
 {
+    const auto originalCall = captureCurrentOriginalCall();
     static uint8_t taxiPed[sizeof(CPed)];
     static uint8_t taxiVeh[sizeof(CVehicle)];
 
-    CPed* ped = callMethodOriginalAndReturn<CPed*, address>(_this, h);
+    CPed* ped = originalCall.callMethodAndReturn<CPed*>(_this, h);
     if (IsPedPointerValid(ped) && IsVehiclePointerValid(ped->m_pVehicle) && ped->bInVehicle)
     {
         CPed* pTaxiPed = reinterpret_cast<CPed*>(&taxiPed);
@@ -2392,9 +2421,10 @@ CPed* __fastcall CPool__atHandleTaxiHooked(void* _this, void*, int h) //Unnecess
 //////////////////////////////////////  SPECIAL FEATURES  //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <std::uintptr_t address>
-char __fastcall SetUpWheelColModelHooked(CAutomobile* automobile, void*, CColModel* colModel)
+__declspec(noinline) char __fastcall SetUpWheelColModelHooked(CAutomobile* automobile, void*, CColModel* colModel)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (automobile == NULL)
         return 0;
 
@@ -2402,39 +2432,42 @@ char __fastcall SetUpWheelColModelHooked(CAutomobile* automobile, void*, CColMod
     if (originalModel == 531 || originalModel == 532 || originalModel == 571) //Tractor || Combine Harvester || Kart
         return 0;
 
-    return callMethodOriginalAndReturn<char, address>(automobile, colModel);
+    return originalCall.callMethodAndReturn<char>(automobile, colModel);
 }
 
-template <std::uintptr_t address>
-char __fastcall BurstTyreHooked(CAutomobile* veh, void*, char componentId, char a3)
+__declspec(noinline) char __fastcall BurstTyreHooked(CAutomobile* veh, void*, char componentId, char a3)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (getVariationOriginalModel(veh->m_nModelIndex) == 432) //Rhino
         return 0;
 
-    return callMethodOriginalAndReturn<char, address>(veh, componentId, a3);
+    return originalCall.callMethodAndReturn<char>(veh, componentId, a3);
 }
 
-template <std::uintptr_t address>
-void __cdecl RegisterCarBlownUpByPlayerHooked(CVehicle* vehicle, int a2)
+__declspec(noinline) void __cdecl RegisterCarBlownUpByPlayerHooked(CVehicle* vehicle, int a2)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (vehicle != NULL)
     {
         const auto model = vehicle->m_nModelIndex;
         vehicle->m_nModelIndex = (unsigned short)getVariationOriginalModel(vehicle->m_nModelIndex);
-        callOriginal<address>(vehicle, a2);
+        originalCall.call(vehicle, a2);
         vehicle->m_nModelIndex = model;
     }
 }
 
-template <std::uintptr_t address>
-void __fastcall ProcessControlInputsHooked(CPlane* _this, void*, unsigned char a2)
+__declspec(noinline) void __fastcall ProcessControlInputsHooked(CPlane* _this, void*, unsigned char a2)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (_this == NULL)
         return;
 
     unsigned short modelIndex = _this->m_nModelIndex;
     _this->m_nModelIndex = (unsigned short)getVariationOriginalModel(_this->m_nModelIndex);
-    callMethodOriginal<address>(_this, a2);
+    originalCall.callMethod(_this, a2);
     _this->m_nModelIndex = modelIndex;
 }
 
@@ -2624,7 +2657,8 @@ isCopBike:
     }
 }
 
-auto RegisterCoronaHookedPointer = RegisterCoronaHooked<0x6ABA60, true>;
+auto RegisterCoronaHookedPointer =
+    &GeneratedCallThunk<0x6ABA60, &RegisterCoronaHooked<true>>::invoke;
 void __declspec(naked) patchCoronas()
 {
     __asm {
@@ -2813,208 +2847,208 @@ void __declspec(naked) movsxReg32WordPtrReg()
 
 void VehicleVariations::InstallHooks()
 {
-    hookCall<0x43022A>(ChooseModelHooked<0x43022A>, "CCarCtrl::ChooseModel"); //CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x43022A, ChooseModelHooked>("CCarCtrl::ChooseModel"); //CCarCtrl::GenerateOneRandomCar
 
-    hookCall<0x42C320>(ChoosePoliceCarModelHooked<0x42C320>, "CCarCtrl::ChoosePoliceCarModel"); //CCarCtrl::CreatePoliceChase
-    hookCall<0x43020E>(ChoosePoliceCarModelHooked<0x43020E>, "CCarCtrl::ChoosePoliceCarModel"); //CCarCtrl::GenerateOneRandomCar
-    hookCall<0x430283>(ChoosePoliceCarModelHooked<0x430283>, "CCarCtrl::ChoosePoliceCarModel"); //CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x42C320, ChoosePoliceCarModelHooked>("CCarCtrl::ChoosePoliceCarModel"); //CCarCtrl::CreatePoliceChase
+    hookSharedCall<0x43020E, ChoosePoliceCarModelHooked>("CCarCtrl::ChoosePoliceCarModel"); //CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x430283, ChoosePoliceCarModelHooked>("CCarCtrl::ChoosePoliceCarModel"); //CCarCtrl::GenerateOneRandomCar
 
 /*****************************************************************************************************/
 
-    hookCall<0x42BC26>(AddPoliceCarOccupantsHooked<0x42BC26>, "CCarAI::AddPoliceCarOccupants"); //CCarCtrl::GenerateOneEmergencyServicesCar
-    hookCall<0x42C620>(AddPoliceCarOccupantsHooked<0x42C620>, "CCarAI::AddPoliceCarOccupants"); //CCarCtrl::CreatePoliceChase
-    hookCall<0x431EE5>(AddPoliceCarOccupantsHooked<0x431EE5>, "CCarAI::AddPoliceCarOccupants"); //CCarCtrl::GenerateOneRandomCar
-    hookCall<0x499CBB>(AddPoliceCarOccupantsHooked<0x499CBB>, "CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
-    hookCall<0x499D6A>(AddPoliceCarOccupantsHooked<0x499D6A>, "CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
-    hookCall<0x49A5EB>(AddPoliceCarOccupantsHooked<0x49A5EB>, "CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
-    hookCall<0x49A85E>(AddPoliceCarOccupantsHooked<0x49A85E>, "CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
-    hookCall<0x49A9AF>(AddPoliceCarOccupantsHooked<0x49A9AF>, "CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
+    hookSharedCall<0x42BC26, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CCarCtrl::GenerateOneEmergencyServicesCar
+    hookSharedCall<0x42C620, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CCarCtrl::CreatePoliceChase
+    hookSharedCall<0x431EE5, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x499CBB, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
+    hookSharedCall<0x499D6A, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
+    hookSharedCall<0x49A5EB, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
+    hookSharedCall<0x49A85E, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
+    hookSharedCall<0x49A9AF, AddPoliceCarOccupantsHooked>("CCarAI::AddPoliceCarOccupants"); //CSetPiece::Update
 
 /*****************************************************************************************************/
     
-    hookCall<0x42B909>(CAutomobileHooked<0x42B909>, "CAutomobile::CAutomobile"); //CCarCtrl::GenerateOneEmergencyServicesCar
-    hookCall<0x462217>(CAutomobileHooked<0x462217>, "CAutomobile::CAutomobile"); //CRoadBlocks::CreateRoadBlockBetween2Points
-    hookCall<0x4998F0>(CAutomobileHooked<0x4998F0>, "CAutomobile::CAutomobile"); //CSetPiece::TryToGenerateCopCar
-    hookCall<0x61354A>(CAutomobileHooked<0x61354A>, "CAutomobile::CAutomobile"); //CPopulation::CreateWaitingCoppers
+    hookSharedCall<0x42B909, CAutomobileHooked>("CAutomobile::CAutomobile"); //CCarCtrl::GenerateOneEmergencyServicesCar
+    hookSharedCall<0x462217, CAutomobileHooked>("CAutomobile::CAutomobile"); //CRoadBlocks::CreateRoadBlockBetween2Points
+    hookSharedCall<0x4998F0, CAutomobileHooked>("CAutomobile::CAutomobile"); //CSetPiece::TryToGenerateCopCar
+    hookSharedCall<0x61354A, CAutomobileHooked>("CAutomobile::CAutomobile"); //CPopulation::CreateWaitingCoppers
 
-    hookCall<0x6F3583>(PickRandomCarHooked<0x6F3583>, "CLoadedCarGroup::PickRandomCar"); //CCarGenerator::DoInternalProcessing
-    hookCall<0x6F3EC1>(DoInternalProcessingHooked<0x6F3EC1>, "CCarGenerator::DoInternalProcessing"); //CCarGenerator::Process 
+    hookSharedCall<0x6F3583, PickRandomCarHooked>("CLoadedCarGroup::PickRandomCar"); //CCarGenerator::DoInternalProcessing
+    hookSharedCall<0x6F3EC1, DoInternalProcessingHooked>("CCarGenerator::DoInternalProcessing"); //CCarGenerator::Process 
     hookASM(0x6F3B94, 8, movReg16WordPtrReg<REG_AX, REG_ESI, 0x6F3B9C, 4, 0x02133D66>, "CCarGenerator::DoInternalProcessing");
 
     //Trains
-    hookCall<0x6F7634>(CTrainHooked<0x6F7634>, "CTrain::CTrain"); //CTrain::CreateMissionTrain 
+    hookSharedCall<0x6F7634, CTrainHooked>("CTrain::CTrain"); //CTrain::CreateMissionTrain 
     hookASM(0x64475D, 6, cmpWordPtrRegModel<REG_EAX, 0x644763, 0x23A>, "CTaskSimpleCarDrive::ProcessPed");
     hookASM(0x6F60D9, 6, cmpWordPtrRegModel<REG_ESI, 0x6F60DF, 0x23A>, "CTrain::CTrain");
     hookASM(0x6F6576, 6, cmpWordPtrRegModel<REG_EDI, 0x6F657C, 0x23A>, "CTrain::OpenDoor");
     hookASM(0x6F8E8A, 6, cmpWordPtrRegModel<REG_ESI, 0x6F8E90, 0x23A>, "CTrain::ProcessControl");
 
     //Boats
-    hookCall<0x42149E>(CBoatHooked<0x42149E>, "CBoat::CBoat"); //CCarCtrl::GetNewVehicleDependingOnCarModel
-    hookCall<0x431FD0>(CBoatHooked<0x431FD0>, "CBoat::CBoat"); //CCarCtrl::CreateCarForScript
-    hookCall<0x5D2ADC>(CBoatHooked<0x5D2ADC>, "CBoat::CBoat"); //CPools::LoadVehiclePool
+    hookSharedCall<0x42149E, CBoatHooked>("CBoat::CBoat"); //CCarCtrl::GetNewVehicleDependingOnCarModel
+    hookSharedCall<0x431FD0, CBoatHooked>("CBoat::CBoat"); //CCarCtrl::CreateCarForScript
+    hookSharedCall<0x5D2ADC, CBoatHooked>("CBoat::CBoat"); //CPools::LoadVehiclePool
 
     //Helis
-    hookCall<0x6CD3C3>(CHeliHooked<0x6CD3C3>, "CHeli::CHeli"); //CPlane::DoPlaneGenerationAndRemoval
-    hookCall<0x6C6590>(CHeliHooked<0x6C6590>, "CHeli::CHeli"); //CHeli::GenerateHeli
-    hookCall<0x6C6568>(CHeliHooked<0x6C6568>, "CHeli::CHeli"); //CHeli::GenerateHeli
-    hookCall<0x5D2C46>(CHeliHooked<0x5D2C46>, "CHeli::CHeli"); //CPools::LoadVehiclePool
-    hookCall<0x6C7ACA>(GenerateHeliHooked<0x6C7ACA>, "CHeli::GenerateHeli"); //CHeli::UpdateHelis
+    hookSharedCall<0x6CD3C3, CHeliHooked>("CHeli::CHeli"); //CPlane::DoPlaneGenerationAndRemoval
+    hookSharedCall<0x6C6590, CHeliHooked>("CHeli::CHeli"); //CHeli::GenerateHeli
+    hookSharedCall<0x6C6568, CHeliHooked>("CHeli::CHeli"); //CHeli::GenerateHeli
+    hookSharedCall<0x5D2C46, CHeliHooked>("CHeli::CHeli"); //CPools::LoadVehiclePool
+    hookSharedCall<0x6C7ACA, GenerateHeliHooked>("CHeli::GenerateHeli"); //CHeli::UpdateHelis
 
-    hookCall<0x6CD6D6>(CPlaneHooked<0x6CD6D6>, "CPlane::CPlane"); //CPlane::DoPlaneGenerationAndRemoval
-    hookCall<0x42166F>(CPlaneHooked<0x42166F>, "CPlane::CPlane"); //CCarCtrl::GetNewVehicleDependingOnCarModel
+    hookSharedCall<0x6CD6D6, CPlaneHooked>("CPlane::CPlane"); //CPlane::DoPlaneGenerationAndRemoval
+    hookSharedCall<0x42166F, CPlaneHooked>("CPlane::CPlane"); //CCarCtrl::GetNewVehicleDependingOnCarModel
 
     //Roadblocks
-    hookCall<0x42CDDD>(IsLawEnforcementVehicleHooked<0x42CDDD>, "CVehicle::IsLawEnforcementVehicle"); //CCarCtrl::RemoveDistantCars
-    hookCall<0x42CE07>(GenerateRoadBlockCopsForCarHooked<0x42CE07>, "CRoadBlocks::GenerateRoadBlockCopsForCar"); //CCarCtrl::RemoveDistantCars
-    hookCall<0x4613EB>(GetColModelHooked<0x4613EB>, "CEntity::GetColModel"); //CRoadBlocks::GenerateRoadBlockCopsForCar
-    hookCall<0x5DDCA8>(GetDefaultCopModelHooked<0x5DDCA8>, "CStreaming::GetDefaultCopModel"); //CCopPed::CCopPed
-    hookCall<0x46151A>(CCopPedHooked<0x46151A>, "CCopPed::CCopPed"); //CRoadBlocks::GenerateRoadBlockCopsForCar
-    hookCall<0x461541>(CCopPedHooked<0x461541>, "CCopPed::CCopPed"); //CRoadBlocks::GenerateRoadBlockCopsForCar
+    hookSharedCall<0x42CDDD, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CCarCtrl::RemoveDistantCars
+    hookSharedCall<0x42CE07, GenerateRoadBlockCopsForCarHooked>("CRoadBlocks::GenerateRoadBlockCopsForCar"); //CCarCtrl::RemoveDistantCars
+    hookSharedCall<0x4613EB, GetColModelHooked>("CEntity::GetColModel"); //CRoadBlocks::GenerateRoadBlockCopsForCar
+    hookSharedCall<0x5DDCA8, GetDefaultCopModelHooked>("CStreaming::GetDefaultCopModel"); //CCopPed::CCopPed
+    hookSharedCall<0x46151A, CCopPedHooked>("CCopPed::CCopPed"); //CRoadBlocks::GenerateRoadBlockCopsForCar
+    hookSharedCall<0x461541, CCopPedHooked>("CCopPed::CCopPed"); //CRoadBlocks::GenerateRoadBlockCopsForCar
 
-    hookCall<0x6D1A7A>(AddPedInCarHooked<0x6D1A7A>, "CPopulation::AddPedInCar"); //CVehicle::SetUpDriver
-    hookCall<0x6D1B0E>(AddPedInCarHooked<0x6D1B0E>, "CPopulation::AddPedInCar"); //CVehicle::SetupPassenger 
-    hookCall<0x6F6986>(AddPedInCarHooked<0x6F6986>, "CPopulation::AddPedInCar"); //CTrain::RemoveRandomPassenger
-    hookCall<0x6F786F>(AddPedInCarHooked<0x6F786F>, "CPopulation::AddPedInCar"); //CTrain::CreateMissionTrain
-    hookCall<0x613B7F>(AddPedHooked<0x613B7F>, "CPopulation::AddPed"); //CPopulation::AddPedInCar
-    hookCall<0x431DE2>(SetUpDriverAndPassengersForVehicleHooked<0x431DE2>, "CCarCtrl::SetUpDriverAndPassengersForVehicle"); //CCarCtrl::GenerateOneRandomCar
-    hookCall<0x431DF9>(SetUpDriverAndPassengersForVehicleHooked<0x431DF9>, "CCarCtrl::SetUpDriverAndPassengersForVehicle"); //CCarCtrl::GenerateOneRandomCar
-    hookCall<0x431ED1>(SetUpDriverAndPassengersForVehicleHooked<0x431ED1>, "CCarCtrl::SetUpDriverAndPassengersForVehicle"); //CCarCtrl::GenerateOneRandomCar
-    hookCall<0x42BBFB>(AddAmbulanceOccupantsHooked<0x42BBFB>, "CCarAI::AddAmbulanceOccupants"); //CCarCtrl::GenerateOneEmergencyServicesCar
-    hookCall<0x42BC1A>(AddAmbulanceOccupantsHooked<0x42BC1A>, "CCarAI::AddFiretruckOccupants"); //CCarCtrl::GenerateOneEmergencyServicesCar
+    hookSharedCall<0x6D1A7A, AddPedInCarHooked>("CPopulation::AddPedInCar"); //CVehicle::SetUpDriver
+    hookSharedCall<0x6D1B0E, AddPedInCarHooked>("CPopulation::AddPedInCar"); //CVehicle::SetupPassenger 
+    hookSharedCall<0x6F6986, AddPedInCarHooked>("CPopulation::AddPedInCar"); //CTrain::RemoveRandomPassenger
+    hookSharedCall<0x6F786F, AddPedInCarHooked>("CPopulation::AddPedInCar"); //CTrain::CreateMissionTrain
+    hookSharedCall<0x613B7F, AddPedHooked>("CPopulation::AddPed"); //CPopulation::AddPedInCar
+    hookSharedCall<0x431DE2, SetUpDriverAndPassengersForVehicleHooked>("CCarCtrl::SetUpDriverAndPassengersForVehicle"); //CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x431DF9, SetUpDriverAndPassengersForVehicleHooked>("CCarCtrl::SetUpDriverAndPassengersForVehicle"); //CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x431ED1, SetUpDriverAndPassengersForVehicleHooked>("CCarCtrl::SetUpDriverAndPassengersForVehicle"); //CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x42BBFB, AddAmbulanceOccupantsHooked>("CCarAI::AddAmbulanceOccupants"); //CCarCtrl::GenerateOneEmergencyServicesCar
+    hookSharedCall<0x42BC1A, AddAmbulanceOccupantsHooked>("CCarAI::AddFiretruckOccupants"); //CCarCtrl::GenerateOneEmergencyServicesCar
 
-    hookCall<0x42DC19>(IsLawEnforcementVehicleHooked<0x42DC19>, "CVehicle::IsLawEnforcementVehicle"); //CCarCtrl::IsThisAnAppropriateNode
-    hookCall<0x42DD23>(IsLawEnforcementVehicleHooked<0x42DD23>, "CVehicle::IsLawEnforcementVehicle"); //CCarCtrl::IsThisAnAppropriateNode
-    hookCall<0x43DFCA>(IsLawEnforcementVehicleHooked<0x43DFCA>, "CVehicle::IsLawEnforcementVehicle"); //CDarkel::RegisterCarBlownUpByPlayer
-    hookCall<0x478635>(IsLawEnforcementVehicleHooked<0x478635>, "CVehicle::IsLawEnforcementVehicle"); //IS_EMERGENCY_SERVICES_VEHICLE
-    hookCall<0x479A28>(IsLawEnforcementVehicleHooked<0x479A28>, "CVehicle::IsLawEnforcementVehicle"); //IS_COP_VEHICLE_IN_AREA_3D_NO_SAVE
-    hookCall<0x4862B8>(IsLawEnforcementVehicleHooked<0x4862B8>, "CVehicle::IsLawEnforcementVehicle"); //CTheScripts::RemoveThisPed
-    hookCall<0x562D97>(IsLawEnforcementVehicleHooked<0x562D97>, "CVehicle::IsLawEnforcementVehicle"); //CWanted::Update
-    hookCall<0x63E6BA>(IsLawEnforcementVehicleHooked<0x63E6BA>, "CVehicle::IsLawEnforcementVehicle"); //CTaskComplexEnterCar::CreateSubTask
-    hookCall<0x6445FC>(IsLawEnforcementVehicleHooked<0x6445FC>, "CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarDrive::ProcessPed
-    hookCall<0x647E48>(IsLawEnforcementVehicleHooked<0x647E48>, "CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarSetPedOut::ProcessPed
-    hookCall<0x64BD61>(IsLawEnforcementVehicleHooked<0x64BD61>, "CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarSetPedInAsDriver::ProcessPed
-    hookCall<0x64C29F>(IsLawEnforcementVehicleHooked<0x64C29F>, "CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarSetPedSlowDraggedOut::ProcessPed
-    hookCall<0x651145>(IsLawEnforcementVehicleHooked<0x651145>, "CVehicle::IsLawEnforcementVehicle"); //CCarEnterExit::IsVehicleStealable
-    hookCall<0x6B11C2>(IsLawEnforcementVehicleHooked<0x6B11C2>, "CVehicle::IsLawEnforcementVehicle"); //CAutomobile::CAutomobile
+    hookSharedCall<0x42DC19, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CCarCtrl::IsThisAnAppropriateNode
+    hookSharedCall<0x42DD23, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CCarCtrl::IsThisAnAppropriateNode
+    hookSharedCall<0x43DFCA, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CDarkel::RegisterCarBlownUpByPlayer
+    hookSharedCall<0x478635, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //IS_EMERGENCY_SERVICES_VEHICLE
+    hookSharedCall<0x479A28, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //IS_COP_VEHICLE_IN_AREA_3D_NO_SAVE
+    hookSharedCall<0x4862B8, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CTheScripts::RemoveThisPed
+    hookSharedCall<0x562D97, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CWanted::Update
+    hookSharedCall<0x63E6BA, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CTaskComplexEnterCar::CreateSubTask
+    hookSharedCall<0x6445FC, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarDrive::ProcessPed
+    hookSharedCall<0x647E48, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarSetPedOut::ProcessPed
+    hookSharedCall<0x64BD61, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarSetPedInAsDriver::ProcessPed
+    hookSharedCall<0x64C29F, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CTaskSimpleCarSetPedSlowDraggedOut::ProcessPed
+    hookSharedCall<0x651145, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CCarEnterExit::IsVehicleStealable
+    hookSharedCall<0x6B11C2, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //CAutomobile::CAutomobile
 
-    hookCall<0x60C4E8>(PossiblyRemoveVehicleHooked<0x60C4E8>, "CCarCtrl::PossiblyRemoveVehicle"); //CPlayerPed::KeepAreaAroundPlayerClear
-    hookCall<0x42CD55>(PossiblyRemoveVehicleHooked<0x42CD55>, "CCarCtrl::PossiblyRemoveVehicle"); //CCarCtrl::RemoveDistantCars
+    hookSharedCall<0x60C4E8, PossiblyRemoveVehicleHooked>("CCarCtrl::PossiblyRemoveVehicle"); //CPlayerPed::KeepAreaAroundPlayerClear
+    hookSharedCall<0x42CD55, PossiblyRemoveVehicleHooked>("CCarCtrl::PossiblyRemoveVehicle"); //CCarCtrl::RemoveDistantCars
 
-    hookCall<0x64BB57>(SetDriverHooked<0x64BB57>, "CVehicle::SetDriver"); //CTaskSimpleCarSetPedInAsDriver::ProcessPed
+    hookSharedCall<0x64BB57, SetDriverHooked>("CVehicle::SetDriver"); //CTaskSimpleCarSetPedInAsDriver::ProcessPed
 
-    hookCall<0x871164>(CAutomobile__PreRenderHooked<0x871164>, "CAutomobile::PreRender", true);
-    hookCall<0x6CFADC>(CAutomobile__PreRenderHooked<0x6CFADC>, "CAutomobile::PreRender"); //CTrailer::PreRender
+    hookSharedCall<0x871164, CAutomobile__PreRenderHooked>("CAutomobile::PreRender", true);
+    hookSharedCall<0x6CFADC, CAutomobile__PreRenderHooked>("CAutomobile::PreRender"); //CTrailer::PreRender
 
-    hookCall<0x6ABC93>(GetVehicleAppearanceHooked<0x6ABC93>, "CVehicle::GetVehicleAppearance"); //CAutomobile::PreRender
+    hookSharedCall<0x6ABC93, GetVehicleAppearanceHooked>("CVehicle::GetVehicleAppearance"); //CAutomobile::PreRender
     x6ABCBE_Destination = injector::MakeJMP(0x6ABCBE, patch6ABCBE).as_int();
 
-    hookCall<0x85C5F4>(CreateInstanceHooked<0x85C5F4>, "CVehicleModelInfo::CreateInstance", true);
-    hookCall<0x40C80F>(LoadClumpFileHooked<0x40C80F>, "CFileLoader::LoadClumpFile"); //CStreaming::ConvertBufferToObject
+    hookSharedCall<0x85C5F4, CreateInstanceHooked>("CVehicleModelInfo::CreateInstance", true);
+    hookSharedCall<0x40C80F, LoadClumpFileHooked>("CFileLoader::LoadClumpFile"); //CStreaming::ConvertBufferToObject
 
-    hookCall<0x4306A1>(GetNewVehicleDependingOnCarModelHooked<0x4306A1>, "CCarCtrl::GetNewVehicleDependingOnCarModel"); ///CCarCtrl::GenerateOneRandomCar
+    hookSharedCall<0x4306A1, GetNewVehicleDependingOnCarModelHooked>("CCarCtrl::GetNewVehicleDependingOnCarModel"); ///CCarCtrl::GenerateOneRandomCar
 
-    hookCall<0x6D5F2F>(CPhysicalHooked<0x6D5F2F>, "CPhysical::CPhysical"); //CVehicle::CVehicle
+    hookSharedCall<0x6D5F2F, CPhysicalHooked>("CPhysical::CPhysical"); //CVehicle::CVehicle
 
-    hookCall<0x6CFFBB>(AddAudioEventHooked<0x6CFFBB>, "CAEVehicleAudioEntity::AddAudioEvent"); //CTrailer::SetTowLink
-    hookCall<0x6CEFCE>(AddAudioEventHooked<0x6CEFCE>, "CAEVehicleAudioEntity::AddAudioEvent"); //CTrailer::BreakTowLink
+    hookSharedCall<0x6CFFBB, AddAudioEventHooked>("CAEVehicleAudioEntity::AddAudioEvent"); //CTrailer::SetTowLink
+    hookSharedCall<0x6CEFCE, AddAudioEventHooked>("CAEVehicleAudioEntity::AddAudioEvent"); //CTrailer::BreakTowLink
 
-    hookCall<0x4251E6>(CWorld__RemoveHooked<0x4251E6>, "CWorld::Remove"); //CCarCtrl::PossiblyRemoveVehicle
-    hookCall<0x425221>(CWorld__RemoveHooked<0x425221>, "CWorld::Remove"); //CCarCtrl::PossiblyRemoveVehicle
-    hookCall<0x42541E>(CWorld__RemoveHooked<0x42541E>, "CWorld::Remove"); //CCarCtrl::PossiblyRemoveVehicle
-    hookCall<0x4323F9>(CWorld__RemoveHooked<0x4323F9>, "CWorld::Remove"); //CCarCtrl::RemoveCarsIfThePoolGetsFull
-    hookCall<0x449729>(CWorld__RemoveHooked<0x449729>, "CWorld::Remove"); //CGarage::RemoveCarsBlockingDoorNotInside
-    hookCall<0x4499F3>(CWorld__RemoveHooked<0x4499F3>, "CWorld::Remove"); //CGarage::StoreAndRemoveCarsForThisHideOut
-    hookCall<0x449B43>(CWorld__RemoveHooked<0x449B43>, "CWorld::Remove"); //CGarage::StoreAndRemoveCarsForThisImpoundingGarage
-    hookCall<0x449CE0>(CWorld__RemoveHooked<0x449CE0>, "CWorld::Remove"); //CGarage::TidyUpGarage
-    hookCall<0x449E2A>(CWorld__RemoveHooked<0x449E2A>, "CWorld::Remove"); //CGarage::TidyUpGarageClose
-    hookCall<0x4610CC>(CWorld__RemoveHooked<0x4610CC>, "CWorld::Remove"); //CRoadBlocks::ClearSpaceForRoadBlockObject
-    hookCall<0x467B3C>(CWorld__RemoveHooked<0x467B3C>, "CWorld::Remove"); //DELETE_CAR
-    hookCall<0x4698E4>(CWorld__RemoveHooked<0x4698E4>, "CWorld::Remove"); //DELETE_OBJECT
-    hookCall<0x486D3E>(CWorld__RemoveHooked<0x486D3E>, "CWorld::Remove"); //CTheScripts::ClearSpaceForMissionEntity
-    hookCall<0x499D90>(CWorld__RemoveHooked<0x499D90>, "CWorld::Remove"); //CSetPiece::Update
-    hookCall<0x49A45A>(CWorld__RemoveHooked<0x49A45A>, "CWorld::Remove"); //CSetPiece::Update
-    hookCall<0x5667B0>(CWorld__RemoveHooked<0x5667B0>, "CWorld::Remove"); //CWorld::ClearCarsFromArea
-    hookCall<0x6A9CA4>(CWorld__RemoveHooked<0x6A9CA4>, "CWorld::Remove"); //CAutomobile::Teleport
-    hookCall<0x6D22D7>(CWorld__RemoveHooked<0x6D22D7>, "CWorld::Remove"); //DestroyVehicleAndDriverAndPassengers
+    hookSharedCall<0x4251E6, CWorld__RemoveHooked>("CWorld::Remove"); //CCarCtrl::PossiblyRemoveVehicle
+    hookSharedCall<0x425221, CWorld__RemoveHooked>("CWorld::Remove"); //CCarCtrl::PossiblyRemoveVehicle
+    hookSharedCall<0x42541E, CWorld__RemoveHooked>("CWorld::Remove"); //CCarCtrl::PossiblyRemoveVehicle
+    hookSharedCall<0x4323F9, CWorld__RemoveHooked>("CWorld::Remove"); //CCarCtrl::RemoveCarsIfThePoolGetsFull
+    hookSharedCall<0x449729, CWorld__RemoveHooked>("CWorld::Remove"); //CGarage::RemoveCarsBlockingDoorNotInside
+    hookSharedCall<0x4499F3, CWorld__RemoveHooked>("CWorld::Remove"); //CGarage::StoreAndRemoveCarsForThisHideOut
+    hookSharedCall<0x449B43, CWorld__RemoveHooked>("CWorld::Remove"); //CGarage::StoreAndRemoveCarsForThisImpoundingGarage
+    hookSharedCall<0x449CE0, CWorld__RemoveHooked>("CWorld::Remove"); //CGarage::TidyUpGarage
+    hookSharedCall<0x449E2A, CWorld__RemoveHooked>("CWorld::Remove"); //CGarage::TidyUpGarageClose
+    hookSharedCall<0x4610CC, CWorld__RemoveHooked>("CWorld::Remove"); //CRoadBlocks::ClearSpaceForRoadBlockObject
+    hookSharedCall<0x467B3C, CWorld__RemoveHooked>("CWorld::Remove"); //DELETE_CAR
+    hookSharedCall<0x4698E4, CWorld__RemoveHooked>("CWorld::Remove"); //DELETE_OBJECT
+    hookSharedCall<0x486D3E, CWorld__RemoveHooked>("CWorld::Remove"); //CTheScripts::ClearSpaceForMissionEntity
+    hookSharedCall<0x499D90, CWorld__RemoveHooked>("CWorld::Remove"); //CSetPiece::Update
+    hookSharedCall<0x49A45A, CWorld__RemoveHooked>("CWorld::Remove"); //CSetPiece::Update
+    hookSharedCall<0x5667B0, CWorld__RemoveHooked>("CWorld::Remove"); //CWorld::ClearCarsFromArea
+    hookSharedCall<0x6A9CA4, CWorld__RemoveHooked>("CWorld::Remove"); //CAutomobile::Teleport
+    hookSharedCall<0x6D22D7, CWorld__RemoveHooked>("CWorld::Remove"); //DestroyVehicleAndDriverAndPassengers
 
     //Tuning for parked cars
-    hookCall<0x6F3C8C>(CWorld__AddHooked<0x6F3C8C>, "CWorld::Add"); //CCarGenerator::DoInternalProcessing
+    hookSharedCall<0x6F3C8C, CWorld__AddHooked>("CWorld::Add"); //CCarGenerator::DoInternalProcessing
 
     /////////////////////// NULL GUARDS ///////////////////////
     x4306A1_Destination = injector::GetBranchDestination(0x4306A1).as_int();
     if (isAddressValid(x4306A1_Destination))
         hookASM(0x4306A1, 0, patch4306A1, "CCarCtrl::GenerateOneRandomCar");
 
-    hookCall<0x6A078A>(FillFrameArrayHooked<0x6A078A>, "CClumpModelInfo::FillFrameArray"); //CAutomobile::SetupModelNodes
-    hookCall<0x6A65B4>(FillFrameArrayHooked<0x6A65B4>, "CClumpModelInfo::FillFrameArray"); //CAutomobile::SetModelIndex
-    hookCall<0x6B0B92>(FillFrameArrayHooked<0x6B0B92>, "CClumpModelInfo::FillFrameArray"); //CAutomobile::CAutomobile
-    hookCall<0x6B597A>(FillFrameArrayHooked<0x6B597A>, "CClumpModelInfo::FillFrameArray"); //CBike::SetupModelNodes
-    hookCall<0x6B8994>(FillFrameArrayHooked<0x6B8994>, "CClumpModelInfo::FillFrameArray"); //CBike::SetModelIndex
-    hookCall<0x6BF50D>(FillFrameArrayHooked<0x6BF50D>, "CClumpModelInfo::FillFrameArray"); //CBike::CBike
-    hookCall<0x6F01BA>(FillFrameArrayHooked<0x6F01BA>, "CClumpModelInfo::FillFrameArray"); //CBoat::SetupModelNodes
-    hookCall<0x6F2A1D>(FillFrameArrayHooked<0x6F2A1D>, "CClumpModelInfo::FillFrameArray"); //CBoat::CBoat
-    hookCall<0x6F5554>(FillFrameArrayHooked<0x6F5554>, "CClumpModelInfo::FillFrameArray"); //CTrain::SetModelIndex
-    hookCall<0x6F60D1>(FillFrameArrayHooked<0x6F60D1>, "CClumpModelInfo::FillFrameArray"); //CTrain::CTrain
+    hookSharedCall<0x6A078A, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::SetupModelNodes
+    hookSharedCall<0x6A65B4, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::SetModelIndex
+    hookSharedCall<0x6B0B92, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::CAutomobile
+    hookSharedCall<0x6B597A, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::SetupModelNodes
+    hookSharedCall<0x6B8994, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::SetModelIndex
+    hookSharedCall<0x6BF50D, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::CBike
+    hookSharedCall<0x6F01BA, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBoat::SetupModelNodes
+    hookSharedCall<0x6F2A1D, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBoat::CBoat
+    hookSharedCall<0x6F5554, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CTrain::SetModelIndex
+    hookSharedCall<0x6F60D1, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CTrain::CTrain
 
-    hookCall<0x6BF768>(SetupSuspensionLinesHooked<0x6BF768>, "CBike::SetupSuspensionLines"); //CBike::CBike
+    hookSharedCall<0x6BF768, SetupSuspensionLinesHooked>("CBike::SetupSuspensionLines"); //CBike::CBike
 
-    hookCall<0x6B19F2>(UpdateClumpAlphaHooked<0x6B19F2>, "CVehicle::UpdateClumpAlpha"); //CAutomobile::ProcessControl
-    hookCall<0x6B92F5>(UpdateClumpAlphaHooked<0x6B92F5>, "CVehicle::UpdateClumpAlpha"); //CBike::ProcessControl
-    hookCall<0x6F185D>(UpdateClumpAlphaHooked<0x6F185D>, "CVehicle::UpdateClumpAlpha"); //CBoat::ProcessControl
+    hookSharedCall<0x6B19F2, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CAutomobile::ProcessControl
+    hookSharedCall<0x6B92F5, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CBike::ProcessControl
+    hookSharedCall<0x6F185D, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CBoat::ProcessControl
 
-    hookCall<0x6F3DF2>(SetClumpAlphaHooked<0x6F3DF2>, "CVisibilityPlugins::SetClumpAlpha"); //CCarGenerator::DoInternalProcessing
+    hookSharedCall<0x6F3DF2, SetClumpAlphaHooked>("CVisibilityPlugins::SetClumpAlpha"); //CCarGenerator::DoInternalProcessing
     /////////////////////// NULL GUARDS END ///////////////////////
 
     if (vehOptions.changeScriptedCars)
-        hookCall<0x467B01>(CreateCarForScriptHooked<0x467B01>, "CCarCtrl::CreateCarForScript"); //00A5: CREATE_CAR
+        hookSharedCall<0x467B01, CreateCarForScriptHooked>("CCarCtrl::CreateCarForScript"); //00A5: CREATE_CAR
 
     if (vehOptions.enableSiren)
     {
-        hookCall<0x41DC74>(UsesSirenHooked<0x41DC74>, "CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
-        hookCall<0x41E05F>(UsesSirenHooked<0x41E05F>, "CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
-        hookCall<0x41E874>(UsesSirenHooked<0x41E874>, "CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
-        hookCall<0x41F10F>(UsesSirenHooked<0x41F10F>, "CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
-        hookCall<0x462344>(UsesSirenHooked<0x462344>, "CVehicle::UsesSiren"); //CRoadBlocks::CreateRoadBlockBetween2Points
-        hookCall<0x4F77DA>(UsesSirenHooked<0x4F77DA>, "CVehicle::UsesSiren"); //CAEVehicleAudioEntity::Initialise
-        hookCall<0x61369D>(UsesSirenHooked<0x61369D>, "CVehicle::UsesSiren"); //CPopulation::CreateWaitingCoppers
-        hookCall<0x6B2BCB>(UsesSirenHooked<0x6B2BCB>, "CVehicle::UsesSiren"); //CAutomobile::ProcessControl
-        hookCall<0x6E0954>(UsesSirenHooked<0x6E0954>, "CVehicle::UsesSiren"); //CVehicle::ProcessSirenAndHorn
+        hookSharedCall<0x41DC74, UsesSirenHooked>("CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
+        hookSharedCall<0x41E05F, UsesSirenHooked>("CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
+        hookSharedCall<0x41E874, UsesSirenHooked>("CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
+        hookSharedCall<0x41F10F, UsesSirenHooked>("CVehicle::UsesSiren"); //CCarAI::UpdateCarAI
+        hookSharedCall<0x462344, UsesSirenHooked>("CVehicle::UsesSiren"); //CRoadBlocks::CreateRoadBlockBetween2Points
+        hookSharedCall<0x4F77DA, UsesSirenHooked>("CVehicle::UsesSiren"); //CAEVehicleAudioEntity::Initialise
+        hookSharedCall<0x61369D, UsesSirenHooked>("CVehicle::UsesSiren"); //CPopulation::CreateWaitingCoppers
+        hookSharedCall<0x6B2BCB, UsesSirenHooked>("CVehicle::UsesSiren"); //CAutomobile::ProcessControl
+        hookSharedCall<0x6E0954, UsesSirenHooked>("CVehicle::UsesSiren"); //CVehicle::ProcessSirenAndHorn
     }
 
     if (vehOptions.enableLights)
     {
-        hookCall<0x6ABA60>(RegisterCoronaHooked<0x6ABA60>, "CCoronas::RegisterCorona"); //CAutomobile::PreRender
-        hookCall<0x6ABB35>(RegisterCoronaHooked<0x6ABB35>, "CCoronas::RegisterCorona"); //CAutomobile::PreRender
-        hookCall<0x6ABC69>(RegisterCoronaHooked<0x6ABC69>, "CCoronas::RegisterCorona"); //CAutomobile::PreRender
+        hookSharedCall<0x6ABA60, RegisterCoronaHooked<false>>("CCoronas::RegisterCorona"); //CAutomobile::PreRender
+        hookSharedCall<0x6ABB35, RegisterCoronaHooked<false>>("CCoronas::RegisterCorona"); //CAutomobile::PreRender
+        hookSharedCall<0x6ABC69, RegisterCoronaHooked<false>>("CCoronas::RegisterCorona"); //CAutomobile::PreRender
         if (memoryMatchesOriginalExe(0x6ABA56, 5) || forceEnableGlobal || forceEnable.contains(0x6ABA56))
             injector::MakeJMP(0x6ABA56, patchCoronas);
         else
             Log::LogModifiedAddress(0x6ABA56, "Modified method detected: CAutomobile::PreRender - 0x6ABA56 is %s\n", bytesToString(0x6ABA56, 5).c_str());
 
-        hookCall<0x6AB80F>(AddLightHooked<0x6AB80F>, "CPointLights::AddLight"); //CAutomobile::PreRender
-        hookCall<0x6ABBA6>(AddLightHooked<0x6ABBA6>, "CPointLights::AddLight"); //CAutomobile::PreRender
+        hookSharedCall<0x6AB80F, AddLightHooked>("CPointLights::AddLight"); //CAutomobile::PreRender
+        hookSharedCall<0x6ABBA6, AddLightHooked>("CPointLights::AddLight"); //CAutomobile::PreRender
 
-        hookCall<0x6AB34B>(AddDamagedVehicleParticlesHooked<0x6AB34B>, "CVehicle::AddDamagedVehicleParticles"); //CAutomobile::PreRender
+        hookSharedCall<0x6AB34B, AddDamagedVehicleParticlesHooked>("CVehicle::AddDamagedVehicleParticles"); //CAutomobile::PreRender
     }
 
     if (vehOptions.enableTrailerLights)
-        hookCall<0x6ABCB9>(DoVehicleLightsHooked<0x6ABCB9>, "CVehicle::DoVehicleLights"); //CAutomobile::PreRender
+        hookSharedCall<0x6ABCB9, DoVehicleLightsHooked>("CVehicle::DoVehicleLights"); //CAutomobile::PreRender
 
     if (vehOptions.disablePayAndSpray)
-        hookCall<0x44AC75>(IsCarSprayableHooked<0x44AC75>, "CGarages::IsCarSprayable"); //CGarage::Update
+        hookSharedCall<0x44AC75, IsCarSprayableHooked>("CGarages::IsCarSprayable"); //CGarage::Update
 
     if (vehOptions.enableSideMissions)
     {
-        hookCall<0x48DA81>(IsLawEnforcementVehicleHooked<0x48DA81>, "CVehicle::IsLawEnforcementVehicle"); //056C: IS_CHAR_IN_ANY_POLICE_VEHICLE
-        hookCall<0x469624>(CPool__atHandleHooked<0x469624>, "CPool<CPed>::atHandle"); //00DD: IS_CHAR_IN_MODEL
-        hookCall<0x4912AD>(CPool__atHandleTaxiHooked<0x4912AD>, "CPool<CPed>::atHandle"); //0602: IS_CHAR_IN_TAXI
+        hookSharedCall<0x48DA81, IsLawEnforcementVehicleHooked>("CVehicle::IsLawEnforcementVehicle"); //056C: IS_CHAR_IN_ANY_POLICE_VEHICLE
+        hookSharedCall<0x469624, CPool__atHandleHooked>("CPool<CPed>::atHandle"); //00DD: IS_CHAR_IN_MODEL
+        hookSharedCall<0x4912AD, CPool__atHandleTaxiHooked>("CPool<CPed>::atHandle"); //0602: IS_CHAR_IN_TAXI
     }	
 	
     if (vehOptions.enableSpecialFeatures)
     {
-        hookCall<0x8711CC>(SetUpWheelColModelHooked<0x8711CC>, "CAutomobile::SetUpWheelColModel", true);
-        hookCall<0x871B94>(SetUpWheelColModelHooked<0x871B94>, "CAutomobile::SetUpWheelColModel", true);
-        hookCall<0x871CD4>(SetUpWheelColModelHooked<0x871CD4>, "CAutomobile::SetUpWheelColModel", true);
+        hookSharedCall<0x8711CC, SetUpWheelColModelHooked>("CAutomobile::SetUpWheelColModel", true);
+        hookSharedCall<0x871B94, SetUpWheelColModelHooked>("CAutomobile::SetUpWheelColModel", true);
+        hookSharedCall<0x871CD4, SetUpWheelColModelHooked>("CAutomobile::SetUpWheelColModel", true);
      
         hookASM(0x525462, 8, movReg16WordPtrReg<REG_AX, REG_EDI, 0x52546A, 4, 0x01BB3D66>, "CCam::Process_FollowCar_SA");
         hookASM(0x431BEB, 7, movReg16WordPtrReg<REG_AX, REG_ESI, 0x431BF2, 3, 0x9004C483>, "CCarCtrl::GenerateOneRandomCar");
@@ -3271,12 +3305,12 @@ void VehicleVariations::InstallHooks()
             hookASM(0x729B76, 5, patch729B76, "CAutomobile::FireTruckControl");
         }
 
-        hookCall<0x8711D0>(BurstTyreHooked<0x8711D0>, "CAutomobile::BurstTyre", true);
+        hookSharedCall<0x8711D0, BurstTyreHooked>("CAutomobile::BurstTyre", true);
 
-        hookCall<0x6B39E6>(RegisterCarBlownUpByPlayerHooked<0x6B39E6>, "CDarkel::RegisterCarBlownUpByPlayer"); //CAutomobile::BlowUpCar
-        hookCall<0x6B3DEA>(RegisterCarBlownUpByPlayerHooked<0x6B3DEA>, "CDarkel::RegisterCarBlownUpByPlayer"); //CAutomobile::BlowUpCarCutSceneNoExtras
-        hookCall<0x6E2D14>(RegisterCarBlownUpByPlayerHooked<0x6E2D14>, "CDarkel::RegisterCarBlownUpByPlayer"); //CVehicle::~CVehicle
+        hookSharedCall<0x6B39E6, RegisterCarBlownUpByPlayerHooked>("CDarkel::RegisterCarBlownUpByPlayer"); //CAutomobile::BlowUpCar
+        hookSharedCall<0x6B3DEA, RegisterCarBlownUpByPlayerHooked>("CDarkel::RegisterCarBlownUpByPlayer"); //CAutomobile::BlowUpCarCutSceneNoExtras
+        hookSharedCall<0x6E2D14, RegisterCarBlownUpByPlayerHooked>("CDarkel::RegisterCarBlownUpByPlayer"); //CVehicle::~CVehicle
 
-        hookCall<0x8719A8>(ProcessControlInputsHooked<0x8719A8>, "CPlane::ProcessControlInputs", true);
+        hookSharedCall<0x8719A8, ProcessControlInputsHooked>("CPlane::ProcessControlInputs", true);
     }
 }

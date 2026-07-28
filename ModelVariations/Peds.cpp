@@ -741,8 +741,7 @@ void PedVariations::LogVariations()
 ///////////////////////////////////////////  CALL HOOKS    ////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <std::uintptr_t address>
-int __cdecl getKillsByPlayer(int player)
+__declspec(noinline) int __cdecl getKillsByPlayer(int player)
 {
     int sum = 0;
 
@@ -752,11 +751,12 @@ int __cdecl getKillsByPlayer(int player)
     return sum;
 }
 
-template <std::uintptr_t address>
-void __fastcall SetModelIndexHooked(CEntity* _this, void*, const int index)
+__declspec(noinline) void __fastcall SetModelIndexHooked(CEntity* _this, void*, const int index)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (index < 7 || index > 65535 || (vectorHasId(pedVars.disableOnMission, index) && CTheScripts__IsPlayerOnAMission()))
-        return callMethodOriginal<address>(_this, index);
+        return originalCall.callMethod(_this, index);
 
     auto it = pedVars.currentVariations.find((unsigned short)index);
     if (isValidPedId(index) && it != pedVars.currentVariations.end() && !it->second.empty())
@@ -767,10 +767,10 @@ void __fastcall SetModelIndexHooked(CEntity* _this, void*, const int index)
             if (auto loadState = loadModel(newModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
             {
                 Log::Write("Error loading ped model %d (%s) %s. Using original model %d.\n", newModel, modelNames.contains(newModel) ? modelNames[newModel].c_str() : "", getLoadStateString(loadState).c_str(), index);
-                return callMethodOriginal<address>(_this, index);
+                return originalCall.callMethod(_this, index);
             }
                     
-            callMethodOriginal<address>(_this, newModel);
+            originalCall.callMethod(_this, newModel);
 
             if (!vectorHasId(pedVars.dontInheritBehaviourModels, index))
                 _this->m_nModelIndex = (unsigned short)index;
@@ -779,13 +779,13 @@ void __fastcall SetModelIndexHooked(CEntity* _this, void*, const int index)
         }
     }
 
-    callMethodOriginal<address>(_this, index);
+    originalCall.callMethod(_this, index);
 }
 
-template <std::uintptr_t address>
-void __fastcall UpdateRpHAnimHooked(CPed* entity)
+__declspec(noinline) void __fastcall UpdateRpHAnimHooked(CPed* entity)
 {
-    callMethodOriginal<address>(entity);
+    const auto originalCall = captureCurrentOriginalCall();
+    originalCall.callMethod(entity);
 
     if (auto it = pedVars.animGroups.find(variationModel > 0 ? variationModel : entity->m_nModelIndex); it != pedVars.animGroups.end())
         entity->m_nAnimGroup = it->second;
@@ -795,9 +795,10 @@ void __fastcall UpdateRpHAnimHooked(CPed* entity)
     variationModel = 0;
 }
 
-template <std::uintptr_t address>
-char __fastcall CAEPedSpeechAudioEntity__InitialiseHooked(CAEPedSpeechAudioEntity* _this, void*, CPed* ped)
+__declspec(noinline) char __fastcall CAEPedSpeechAudioEntity__InitialiseHooked(CAEPedSpeechAudioEntity* _this, void*, CPed* ped)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (ped != NULL)
     {
         const auto currentModel = ped->m_nModelIndex;
@@ -825,28 +826,29 @@ char __fastcall CAEPedSpeechAudioEntity__InitialiseHooked(CAEPedSpeechAudioEntit
         {
             changedVoices[ped] = newModel;
             ped->m_nModelIndex = newModel;
-            char retVal = callMethodOriginalAndReturn<char, address>(_this, ped);
+            char retVal = originalCall.callMethodAndReturn<char>(_this, ped);
             ped->m_nModelIndex = currentModel;
             return retVal;
         }
     }
 
-    return callMethodOriginalAndReturn<char, address>(_this, ped);
+    return originalCall.callMethodAndReturn<char>(_this, ped);
 }
 
-template <std::uintptr_t address>
-CPhysical* __fastcall CPhysicalHooked(CPed* _this)
+__declspec(noinline) CPhysical* __fastcall CPhysicalHooked(CPed* _this)
 {
+    const auto originalCall = captureCurrentOriginalCall();
     changedVoices.erase(_this);
-    CPhysical* retVal = callMethodOriginalAndReturn<CPhysical*, address>(_this);
+    CPhysical* retVal = originalCall.callMethodAndReturn<CPhysical*>(_this);
     pedVars.stack.push(_this);
     return retVal;
 }
 
 //Improper fix for crash 0x68FB5C
-template <std::uintptr_t address>
-void* __fastcall CreateNextSubTaskHooked(CTaskComplexCopInCar* _this, void*, CPed* ped)
+__declspec(noinline) void* __fastcall CreateNextSubTaskHooked(CTaskComplexCopInCar* _this, void*, CPed* ped)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     if (_this == NULL)
         Log::Write("CreateNextSubTaskHooked _this is NULL. ped is 0x%08X\n", ped);
     else if (ped == NULL)
@@ -865,30 +867,32 @@ void* __fastcall CreateNextSubTaskHooked(CTaskComplexCopInCar* _this, void*, CPe
             uint8_t originalData[7];
             injector::ReadMemoryRaw(0x68FB5C, originalData, 7, true);
             injector::MakeNOP(0x68FB5C, 7);
-            auto retVal = callMethodOriginalAndReturn<void*, address>(_this, ped);
+            auto retVal = originalCall.callMethodAndReturn<void*>(_this, ped);
             injector::WriteMemoryRaw(0x68FB5C, originalData, 7, true);
             return retVal;
         }
     }
 
-    return callMethodOriginalAndReturn<void*, address>(_this, ped);
+    return originalCall.callMethodAndReturn<void*>(_this, ped);
 }
 
-template <std::uintptr_t address>
-bool __cdecl PedIsAcceptableInCurrentZoneHooked(int a1)
+__declspec(noinline) bool __cdecl PedIsAcceptableInCurrentZoneHooked(int a1)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     for (CPed *ped : CPools::ms_pPedPool)
     {
         if (ped && ped->m_nModelIndex == a1)
             return false;
     }
 
-    return callOriginalAndReturn<bool, address>(a1);
+    return originalCall.callAndReturn<bool>(a1);
 }
 
-template <std::uintptr_t address>
-int __cdecl ChooseCivilianOccupationForVehicleHooked(char male, CVehicle* a2)
+__declspec(noinline) int __cdecl ChooseCivilianOccupationForVehicleHooked(char male, CVehicle* a2)
 {
+    const auto originalCall = captureCurrentOriginalCall();
+
     auto vehDrivers = { 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34, 
                         35, 36, 37, 40, 43, 44, 45, 46, 47, 48, 50, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69, 71, 72, 73, 
                         82, 83, 84, 90, 91, 93, 94, 95, 97, 98, 100, 101, 128, 131, 132, 133, 134, 135, 136, 137, 138, 
@@ -898,7 +902,7 @@ int __cdecl ChooseCivilianOccupationForVehicleHooked(char male, CVehicle* a2)
                         241, 242, 247, 248, 250, 255, 260, 261, 262, 263 };
 
 
-    auto modelid = callOriginalAndReturn<int, address>(male, a2);
+    auto modelid = originalCall.callAndReturn<int>(male, a2);
     CVehicleModelInfo* vehModelInfo = (CVehicleModelInfo*)CModelInfo::GetModelInfo(a2->m_nModelIndex);
 
     if (modelid < 9)
@@ -994,28 +998,28 @@ void PedVariations::InstallHooks(bool enableSpecialPeds)
                 injector::WriteMemory<int16_t*>(0x43D6CF, &destroyedModelCounters[0], true);
             }
 
-            hookCall<0x47360D>(getKillsByPlayer<0x47360D>, "CDarkel::FindTotalPedsKilledByPlayer");
+            hookCall<0x47360D>(getKillsByPlayer, "CDarkel::FindTotalPedsKilledByPlayer");
         }
         else
             Log::Write("Count of killable model IDs was not increased. %s\n", (LoadedModules::IsModLoaded(MOD_FLA) ? "FLA is loaded." : "FLA is NOT loaded."));
     }
 
 
-    hookCall<0x5E4890>(SetModelIndexHooked<0x5E4890>, "CEntity::SetModelIndex");
-    hookCall<0x5E49EF>(UpdateRpHAnimHooked<0x5E49EF>, "CEntity::UpdateRpHAnim");
+    hookSharedCall<0x5E4890, SetModelIndexHooked>("CEntity::SetModelIndex");
+    hookSharedCall<0x5E49EF, UpdateRpHAnimHooked>("CEntity::UpdateRpHAnim");
 
-    hookCall<0x5DDBB8>(CAEPedSpeechAudioEntity__InitialiseHooked<0x5DDBB8>, "CAEPedSpeechAudioEntity::Initialise"); //CCivilianPed
-    hookCall<0x5DDD24>(CAEPedSpeechAudioEntity__InitialiseHooked<0x5DDD24>, "CAEPedSpeechAudioEntity::Initialise"); //CCopPed
-    hookCall<0x5DE388>(CAEPedSpeechAudioEntity__InitialiseHooked<0x5DE388>, "CAEPedSpeechAudioEntity::Initialise"); //CEmergencyPed
+    hookSharedCall<0x5DDBB8, CAEPedSpeechAudioEntity__InitialiseHooked>("CAEPedSpeechAudioEntity::Initialise"); //CCivilianPed
+    hookSharedCall<0x5DDD24, CAEPedSpeechAudioEntity__InitialiseHooked>("CAEPedSpeechAudioEntity::Initialise"); //CCopPed
+    hookSharedCall<0x5DE388, CAEPedSpeechAudioEntity__InitialiseHooked>("CAEPedSpeechAudioEntity::Initialise"); //CEmergencyPed
 
-    hookCall<0x5E8052>(CPhysicalHooked<0x5E8052>, "CPhysical::CPhysical"); //CPed::CPed
+    hookSharedCall<0x5E8052, CPhysicalHooked>("CPhysical::CPhysical"); //CPed::CPed
 
-    hookCall<0x870A4C>(CreateNextSubTaskHooked<0x870A4C>, "CTaskComplexCopInCar::CreateNextSubTask", true);
+    hookSharedCall<0x870A4C, CreateNextSubTaskHooked>("CTaskComplexCopInCar::CreateNextSubTask", true);
 
     if (pedOptions.improveCivilianVariety)
     {
-        hookCall<0x61302B>(PedIsAcceptableInCurrentZoneHooked<0x61302B>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
-        hookCall<0x61330D>(PedIsAcceptableInCurrentZoneHooked<0x61330D>, "CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
-        hookCall<0x613B32>(ChooseCivilianOccupationForVehicleHooked<0x613B32>, "CPopulation::ChooseCivilianOccupationForVehicle"); //CPopulation::AddPedInCar
+        hookSharedCall<0x61302B, PedIsAcceptableInCurrentZoneHooked>("CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
+        hookSharedCall<0x61330D, PedIsAcceptableInCurrentZoneHooked>("CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
+        hookSharedCall<0x613B32, ChooseCivilianOccupationForVehicleHooked>("CPopulation::ChooseCivilianOccupationForVehicle"); //CPopulation::AddPedInCar
     }
 }
