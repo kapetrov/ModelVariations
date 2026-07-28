@@ -3087,8 +3087,6 @@ void VehicleVariations::InstallHooks()
         hookASM(0x426F94, 6, cmpWordPtrRegModel<REG_ESI, 0x426F9A, 0x21B>, "CCarCtrl::PickNextNodeToChaseCar");
         hookASM(0x427790, 6, cmpWordPtrRegModel<REG_ESI, 0x427796, 0x21B>, "CCarCtrl::PickNextNodeToFollowPath");
         hookASM(0x42DB2E, 6, cmpWordPtrRegModel<REG_EDI, 0x42DB34, 0x21B>, "CCarCtrl::IsThisAnAppropriateNode");
-
-
         hookASM(0x42FE50, 6, cmpWordPtrRegModel<REG_ESI, 0x42FE56, 0x21B>, "CCarCtrl::ReconsiderRoute");
         hookASM(0x42FF0B, 6, cmpWordPtrRegModel<REG_ESI, 0x42FF11, 0x21B>, "CCarCtrl::ReconsiderRoute");
         hookASM(0x435A81, 6, cmpWordPtrRegModel<REG_ESI, 0x435A87, 0x21B>, "CCarCtrl::SteerAICarWithPhysicsFollowPath_Racing");
@@ -3163,9 +3161,6 @@ void VehicleVariations::InstallHooks()
         hookASM(0x6C8F96, 6, cmpReg32Model<REG_EDI, 0x6C8F9C, 0x229>, "CPlane::CPlane");
         hookASM(0x6C8FCB, 6, cmpReg32Model<REG_EDI, 0x6C8FD1, 0x21B>, "CPlane::CPlane");
         hookASM(0x6C8FFA, 6, cmpReg32Model<REG_EDI, 0x6C9000, 0x201>, "CPlane::CPlane");
-
-
-
         hookASM(0x6D6A7B, 10, movsxReg32WordPtrReg<REG_ECX, REG_ESI, 0x6D6A85, 6, 0x04888688, 0x90900000>, "CVehicle::SetModelIndex");
         hookASM(0x429051, 6, cmpWordPtrRegModel<REG_ESI, 0x429057, 0x1AE>, "CCarCtrl::SteerAIBoatWithPhysicsAttackingPlayer");
         hookASM(0x48DA90, 6, cmpWordPtrRegModel<REG_EAX, 0x48DA96, 0x1AE>, "CRunningScript::ProcessCommands1300To1399");

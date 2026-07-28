@@ -79,21 +79,26 @@ bool isTimeInRange(int timeNow, int timeStart, int timeEnd)
 
 std::string getDatetime(bool printDate, bool printTime, bool printMs)
 {
-    SYSTEMTIME s;
-    GetSystemTime(&s);
+    SYSTEMTIME systime;
+    GetSystemTime(&systime);
+    std::string str;
 
-    auto day = std::to_string(s.wDay);
-    auto month = std::to_string(s.wMonth);
-    auto year = std::to_string(s.wYear);
+    if (printDate)
+    {
+        str = msprintf("%d/%d/%d", systime.wDay, systime.wMonth, systime.wYear);
+        if (printTime)
+            str += " ";
+    }
 
-    auto z = [](int n, int width)
-        {
-            std::string r = std::to_string(n);
-            return std::string(width - r.size(), '0') + r;
-        };
+    if (printTime)
+    {
+        str += msprintf("%02d:%02d:%02d", systime.wHour, systime.wMinute, systime.wSecond);
 
-    return (printDate ? day + "/" + month + "/" + year + (printTime ? " " : "") : "") +
-        (printTime ? z(s.wHour, 2) + ":" + z(s.wMinute, 2) + ":" + z(s.wSecond, 2) + (printMs ? "." + z(s.wMilliseconds, 3) : "") : "");
+        if (printMs)
+            str += msprintf(".%03d", systime.wMilliseconds);
+    }
+
+    return str;
 }
 
 bool loadPESection(const char* filePath, int sectionIndex, std::vector<unsigned char>* buffer, unsigned int* size, std::string_view sectionName)
