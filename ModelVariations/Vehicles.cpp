@@ -595,7 +595,48 @@ int getRandomVariation(const int modelid, bool parked = false)
 
 void VehicleVariations::ClearData()
 {
-    vehVars = {};
+    vehVars.variations.clear();
+    vehVars.wantedVariations.clear();
+    vehVars.currentVariations.clear();
+    vehVars.occupantGroups.clear();
+    vehVars.trailerZones.clear();
+    vehVars.currentTuning = nullptr;
+    vehVars.tuning.clear();
+    vehVars.groupWantedVariations.clear();
+    vehVars.drivers.clear();
+    vehVars.passengers.clear();
+
+    for (int i = 0; i < 9; i++)
+    {
+        vehVars.driverGroups[i].clear();
+        vehVars.passengerGroups[i].clear();
+        vehVars.trailers[i].clear();
+    }
+
+    vehVars.timeGroups.clear();
+    vehVars.activeTimeGroups.clear();
+    vehVars.lightPositions.clear();
+    vehVars.lightColors.clear();
+    vehVars.lightColors2.clear();
+    vehVars.lightSizes.clear();
+    vehVars.tuningDriverIds.clear();
+    vehVars.vehModels.clear();
+    vehVars.tuningChances.clear();
+    vehVars.trailersSpawnChances.clear();
+    vehVars.trailersHealth.clear();
+    vehVars.trailersMatchExtras.clear();
+    vehVars.trailersMatchColors.clear();
+
+    vehVars.parkedCars.clear();
+    vehVars.useOnlyGroups.clear();
+
+    vehVars.vehHasVariations.clear();
+
+    while (!vehVars.tuningStack.empty())
+        vehVars.tuningStack.pop();
+    while (!vehVars.stack.empty())
+        vehVars.stack.pop();
+
     vehOptions = {};
 
     for (std::size_t i = 0; i < vehVars.originalModels.size(); ++i)
