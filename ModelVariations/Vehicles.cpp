@@ -1169,7 +1169,7 @@ void VehicleVariations::Process()
                     break;
                 }
             
-            if (veh->m_pDriver && veh->m_pDriver != FindPlayerPed() && spawnTrailer && !isAnotherVehicleBehind(veh, {}))
+            if (IsVehiclePointerValid(veh) && veh->m_pDriver && veh->m_pDriver != FindPlayerPed() && spawnTrailer && !isAnotherVehicleBehind(veh, {}))
             {
                 std::vector<unsigned short> zoneTrailers;
                 if (auto it = vehVars.trailerZones.find(*reinterpret_cast<uint64_t*>(currentZone)); it != vehVars.trailerZones.end())
@@ -2696,8 +2696,7 @@ isCopBike:
     }
 }
 
-auto RegisterCoronaHookedPointer =
-    &GeneratedCallThunk<0x6ABA60, &RegisterCoronaHooked<true>>::invoke;
+auto RegisterCoronaHookedPointer = &GeneratedCallThunk<0x6ABA60, &RegisterCoronaHooked<true>>::invoke;
 void __declspec(naked) patchCoronas()
 {
     __asm {

@@ -51,6 +51,7 @@ std::set<unsigned short> referenceCountModels;
 std::set<unsigned short> addedIDsInGroups;
 
 std::string exePath(256, 0);
+std::string versionPath;
 
 std::unordered_map<unsigned short, std::string> addedIDs;
 std::unordered_map<unsigned short, std::string> modelNames;
@@ -113,7 +114,7 @@ bool modInitialized = false;
 
 bool checkForUpdate()
 {
-    std::string str = fileToString("version.json");
+    std::string str = fileToString(versionPath);
 
     if (auto start = str.find("\"v"); start != std::string::npos)
         if (auto end = str.find_first_of('"', start+1); end != std::string::npos && end > start + 2)
@@ -1019,7 +1020,10 @@ public:
         char buffer[MAX_PATH] = {};
         DWORD len = GetTempPathA(MAX_PATH, buffer);
         if (len != 0 && len < MAX_PATH)
-            download_async("http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", std::string(buffer) + "version.json");
+        {
+            versionPath = std::string(buffer) + "version.json";
+            download_async("http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", versionPath);
+        }
 
         iniSettings.Load(dataFileName);
 
