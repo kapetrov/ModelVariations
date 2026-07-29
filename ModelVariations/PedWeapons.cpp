@@ -10,6 +10,7 @@
 #include <CModelInfo.h>
 #include <CPed.h>
 
+#include <map>
 #include <stack>
 #include <string>
 #include <unordered_map>
@@ -69,7 +70,7 @@ void PedWeaponVariations::ClearData()
 
     pedWeaponOptions = {};
 
-    dataFile.data.clear();
+    dataFile.Clear();
 }
 
 void PedWeaponVariations::LoadData()
@@ -84,13 +85,12 @@ void PedWeaponVariations::LoadData()
 
     for (auto& iniData : dataFile.data)
     {
-        Log::Write("%s\n", iniData.first.c_str());
-
         if (iniData.first == "Global")
             iniHasGlobal = true;
 
         int modelid = 0;
-        std::string section = iniData.first;
+        std::string section(iniData.first);
+        Log::Write("%s\n", section.c_str());
 
         if (!(section[0] >= '0' && section[0] <= '9'))
         {
@@ -109,7 +109,7 @@ void PedWeaponVariations::LoadData()
         }
 
         for (auto& kvp : iniData.second)
-            for (const std::string& token : splitString(kvp.first, '|'))
+            for (const std::string& token : splitString(std::string(kvp.first), '|'))
             {
                 auto mInfo = CModelInfo::GetModelInfo(token.c_str(), &modelid);
                 if (mInfo && mInfo->GetModelType() == MODEL_INFO_VEHICLE && modelid > 0 && modelid < 65536)

@@ -20,6 +20,7 @@
 #include <CWorld.h>
 
 #include <array>
+#include <map>
 #include <stack>
 #include <chrono>
 
@@ -145,7 +146,7 @@ void PedVariations::ClearData()
     pedVars = {};
     pedOptions = {};
 
-    dataFile.data.clear();
+    dataFile.Clear();
 }
 
 void PedVariations::LoadData()
@@ -156,10 +157,9 @@ void PedVariations::LoadData()
 
     for (auto& iniData : dataFile.data)
     {
-        Log::Write("%s\n", iniData.first.c_str());
-
         int i = 0;
-        std::string section = iniData.first;
+        std::string section(iniData.first);
+        Log::Write("%s\n", section.c_str());
 
         if (!section.empty() && section[0] >= '0' && section[0] <= '9')
             fromString<int>(iniData.first, i);
@@ -174,7 +174,7 @@ void PedVariations::LoadData()
         {
             for (auto& kvp : iniData.second)
             {
-                if (auto it = presetAllZones.find(kvp.first); it != presetAllZones.end())
+                if (auto it = presetAllZones.find(std::string(kvp.first)); it != presetAllZones.end())
                 {
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_PEDS);
 
@@ -197,11 +197,11 @@ void PedVariations::LoadData()
                         }
                     }
                 }
-                else if (strncmp(kvp.first.c_str(), "MISSION", 7) == 0)
+                else if (kvp.first.starts_with("MISSION"))
                 {
                     int missionId = -1;
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_PEDS);
-                    if (fromString<int>(kvp.first.c_str() + 7, missionId) && !vec.empty() && missionId < 65536)
+                    if (fromString<int>(kvp.first.substr(7), missionId) && !vec.empty() && missionId < 65536)
                         pedVars.missionVariations[modelIndex][static_cast<unsigned short>(missionId)] = vec;
                 }
             }
@@ -217,7 +217,7 @@ void PedVariations::LoadData()
                     {
                         pedVars.pedHasVariations.insert(modelIndex);
                         uint64_t zoneName = 0;
-                        copyString((char*)&zoneName, kvp.first.c_str(), 8);
+                        copyString((char*)&zoneName, kvp.first.data(), std::min<std::size_t>(8, kvp.first.size()));
                         pedVars.variations[zoneName][modelIndex] = mergeZones ? vectorUnion(pedVars.variations[zoneName][modelIndex], vec) : vec;
                     }
                 }

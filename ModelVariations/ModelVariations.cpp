@@ -191,7 +191,7 @@ void logVariationsChange(const char* msg)
 
 void clearEverything()
 {
-    iniSettings.data.clear();
+    iniSettings.Clear();
 
     PedVariations::ClearData();
     PedWeaponVariations::ClearData();
@@ -319,9 +319,14 @@ void initialize()
             Log::Write("%s\n", printFilenameWithBorder(flaIniPath.substr(flaIniPath.find_last_of("/\\") + 1), '#').c_str());
             for (auto& i : flaIni.data)
             {
-                Log::Write("[%s]\n", i.first.c_str());
+                const std::string section(i.first);
+                Log::Write("[%s]\n", section.c_str());
                 for (auto& j : i.second)
-                    Log::Write("%s = %s\n\n", j.first.c_str(), j.second.c_str());
+                {
+                    const std::string key(j.first);
+                    const std::string value(j.second);
+                    Log::Write("%s = %s\n\n", key.c_str(), value.c_str());
+                }
             }
         }
     }
@@ -933,8 +938,9 @@ __declspec(noinline) void __cdecl InitialiseGameHooked()
     Log::Write("-- InitialiseGame Start (%s) --\n", getDatetime(false, true, true).c_str());
 
     Log::Write("Reading zone data...\n");
-    for (const auto &kvp : iniSettings.data["Areas"])
-        areas[kvp.first] = splitString(kvp.second, ',');
+    if (auto areaSection = iniSettings.data.find("Areas"); areaSection != iniSettings.data.end())
+        for (const auto& kvp : areaSection->second)
+            areas[std::string(kvp.first)] = splitString(std::string(kvp.second), ',');
 
     std::unordered_map<std::string, std::vector<CZone*>> presetMainZones;
     for (int k = 0; k < CTheZones::TotalNumberOfInfoZones; k++)

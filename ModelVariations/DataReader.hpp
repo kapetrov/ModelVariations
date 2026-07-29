@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -22,20 +23,34 @@ enum dataTypeToRead
 
 class DataReader
 {
-public:
-	DataReader() {};
-	DataReader(const char* filename);
+private:
+	std::string file; // Owns the character storage referenced by data.
 
+public:
+	using Section = std::map<std::string_view, std::string_view>;
+	using Data = std::map<std::string_view, Section>;
+
+	DataReader() = default;
+	DataReader(const char* filename);
+	DataReader(const DataReader&) = delete;
+	DataReader& operator=(const DataReader&) = delete;
+	DataReader(DataReader&&) = delete;
+	DataReader& operator=(DataReader&&) = delete;
+
+	void Clear();
 	void Load(const char* filename);
 
-	int ReadInteger(const std::string& section, const std::string& key, int defaultValue);
-	unsigned int ReadHex(const std::string& section, const std::string& key, unsigned int defaultValue);
-	float ReadFloat(const std::string& section, const std::string& key, float defaultValue);
-	bool ReadBoolean(const std::string& section, const std::string& key, bool defaultValue);
-	std::string ReadString(const std::string& section, const std::string& key, const std::string &defaultValue);
-	std::vector<unsigned short> ReadLine(const std::string& section, const std::string& key, dataTypeToRead parseType);
-	std::vector<std::vector<unsigned short>> ReadTrailerLine(const std::string& section, const std::string& key);
-	std::vector<unsigned short> ReadLineUnique(const std::string& section, const std::string& key, dataTypeToRead parseType);
+	int ReadInteger(std::string_view section, std::string_view key, int defaultValue);
+	unsigned int ReadHex(std::string_view section, std::string_view key, unsigned int defaultValue);
+	float ReadFloat(std::string_view section, std::string_view key, float defaultValue);
+	bool ReadBoolean(std::string_view section, std::string_view key, bool defaultValue);
+	std::string ReadString(std::string_view section, std::string_view key, std::string_view defaultValue);
+	std::vector<unsigned short> ReadLine(std::string_view section, std::string_view key, dataTypeToRead parseType);
+	std::vector<std::vector<unsigned short>> ReadTrailerLine(std::string_view section, std::string_view key);
+	std::vector<unsigned short> ReadLineUnique(std::string_view section, std::string_view key, dataTypeToRead parseType);
 
-	std::map<std::string, std::map<std::string, std::string>> data;
+	Data data;
+
+private:
+	const std::string_view* FindValue(std::string_view section, std::string_view key) const;
 };

@@ -54,6 +54,7 @@ bool strcasecmp(std::string_view s1, std::string_view s2);
 std::vector<std::string> splitString(const std::string& s, char separator);
 std::vector<std::string> splitString(const std::string& s, const std::string& separators);
 std::string trimString(const std::string& str);
+std::string_view trimView(std::string_view text);
 
 template<class T>
 bool fromString(std::string_view s, T& x, int base = 10)

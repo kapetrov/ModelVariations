@@ -446,6 +446,27 @@ std::string trimString(const std::string& str)
     return str.substr(first, (last - first + 1));
 }
 
+std::string_view trimView(std::string_view text)
+{
+    while (!text.empty())
+    {
+        const char c = text.front();
+        if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
+            break;
+        text.remove_prefix(1);
+    }
+
+    while (!text.empty())
+    {
+        const char c = text.back();
+        if (c != ' ' && c != '\t' && c != '\n' && c != '\r')
+            break;
+        text.remove_suffix(1);
+    }
+
+    return text;
+}
+
 
 /////////////
 // Vectors //

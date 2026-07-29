@@ -20,6 +20,7 @@
 #include <CWorld.h>
 
 #include <array>
+#include <map>
 #include <set>
 #include <stack>
 
@@ -600,7 +601,7 @@ void VehicleVariations::ClearData()
     for (std::size_t i = 0; i < vehVars.originalModels.size(); ++i)
         vehVars.originalModels[i] = static_cast<unsigned short>(i);
 
-    dataFile.data.clear();
+    dataFile.Clear();
 }
 
 void VehicleVariations::LoadData()
@@ -622,9 +623,8 @@ void VehicleVariations::LoadData()
 
     for (auto& iniData : dataFile.data)
     {
-        Log::Write("%s\n", iniData.first.c_str());
-
-        std::string section = iniData.first;
+        std::string section(iniData.first);
+        Log::Write("%s\n", section.c_str());
         int iModel = 0;
         if (section[0] >= '0' && section[0] <= '9')
              fromString<int>(section, iModel);
@@ -642,7 +642,7 @@ void VehicleVariations::LoadData()
                 vehVars.parkedCars.push_back(modelid);
 
             for (auto& kvp : iniData.second)
-                if (auto it = presetAllZones.find(kvp.first); it != presetAllZones.end())
+                if (auto it = presetAllZones.find(std::string(kvp.first)); it != presetAllZones.end())
                 {
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_VEHICLES);
 
@@ -728,7 +728,7 @@ void VehicleVariations::LoadData()
                 if (kvp.first.size() > 1 && (kvp.first[1] < 'a' || kvp.first[1] > 'z'))
                 {
                     uint64_t zoneName = 0;
-                    copyString((char*)&zoneName, kvp.first.c_str(), 8);
+                    copyString((char*)&zoneName, kvp.first.data(), std::min<std::size_t>(8, kvp.first.size()));
 
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_VEHICLES);
                     if (!vec.empty())

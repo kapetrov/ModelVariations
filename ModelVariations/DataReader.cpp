@@ -8,108 +8,170 @@
 #include <CPedModelInfo.h>
 #include <CWeaponInfo.h>
 
+namespace
+{
+	std::string_view cleanLine(std::string_view line)
+	{
+		for (std::size_t i = 0; i < line.size(); ++i)
+			if (line[i] == ';' || line[i] == '#' ||
+				(line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/'))
+			{
+				line.remove_suffix(line.size() - i);
+				break;
+			}
+
+		return trimView(line);
+	}
+
+	std::string_view popToken(std::string_view& list)
+	{
+		std::size_t end = 0;
+		while (end < list.size() && list[end] != ',')
+			++end;
+
+		const std::string_view token = trimView(list.substr(0, end));
+		if (end == list.size())
+			list = {};
+		else
+			list.remove_prefix(end + 1);
+
+		return token;
+	}
+}
+
 DataReader::DataReader(const char* filename)
 {
 	Load(filename);
 }
 
-void DataReader::Load(const char* filename)
+void DataReader::Clear()
 {
 	data.clear();
+	file.clear();
+}
 
-	std::vector<std::string> sections;
-	std::string key, value;
+void DataReader::Load(const char* filename)
+{
+	Clear();
+	file = fileToString(filename);
 
-	for (std::string &line : splitString(fileToString(filename), "\n\r"))
-	{		 
-		if (auto pos = line.find_first_of(";#"); pos < line.size())
-			line.resize(pos);
-		if (auto pos = line.find("//"); pos < line.size())
-			line.resize(pos);
+	std::string_view sections;
+	std::size_t lineStart = 0;
 
-		line = trimString(line);
+	while (lineStart < file.size())
+	{
+		std::size_t lineEnd = lineStart;
+		while (lineEnd < file.size() && file[lineEnd] != '\n' && file[lineEnd] != '\r')
+			++lineEnd;
+
+		std::string_view line = cleanLine(std::string_view(file.data() + lineStart, lineEnd - lineStart));
+
+		lineStart = lineEnd;
+		while (lineStart < file.size() && (file[lineStart] == '\n' || file[lineStart] == '\r'))
+			++lineStart;
+
 		if (line.empty())
 			continue;
 
 		if (line.front() == '[' && line.back() == ']')
 		{
-			sections.clear();
-
-			std::string inner = line.substr(1);
-			inner.resize(inner.size()-1);
-
-			for (std::string &token : splitString(inner, ','))
-			{
-				token = trimString(token);
-				if (!token.empty())
-					sections.push_back(token);
-			}
+			sections = line.substr(1, line.size() - 2);
+			continue;
 		}
-		else if (auto pos = line.find_first_of('='); pos < line.size())
-		{
-			key = trimString(line.substr(0, pos));
-			value = trimString(line.substr(pos + 1));
-			std::vector<std::string> keys = splitString(key, ',');
 
-			if (!keys.empty() && !value.empty())
-				for (auto& s : sections)
-					for (auto &k : keys)
-						data[s][trimString(k)] = value;
+		std::size_t equals = 0;
+		while (equals < line.size() && line[equals] != '=')
+			++equals;
+
+		if (equals < line.size())
+		{
+			std::string_view keys = trimView(line.substr(0, equals));
+			const std::string_view value = trimView(line.substr(equals + 1));
+
+			if (keys.empty() || value.empty())
+				continue;
+
+			std::string_view remainingSections = sections;
+			while (!remainingSections.empty())
+			{
+				const std::string_view section = popToken(remainingSections);
+				if (section.empty())
+					continue;
+
+				std::string_view remainingKeys = keys;
+				while (!remainingKeys.empty())
+				{
+					const std::string_view key = popToken(remainingKeys);
+					if (!key.empty())
+						data[section][key] = value;
+				}
+			}
 		}
 	}
 }
 
-int DataReader::ReadInteger(const std::string &section, const std::string &key, int defaultValue)
+const std::string_view* DataReader::FindValue(std::string_view section, std::string_view key) const
 {
-	int value = defaultValue;
 	if (auto itSection = data.find(section); itSection != data.end())
 		if (auto itKey = itSection->second.find(key); itKey != itSection->second.end())
-			fromString<int>(itKey->second, value);
+			return &itKey->second;
+
+	return nullptr;
+}
+
+int DataReader::ReadInteger(std::string_view section, std::string_view key, int defaultValue)
+{
+	int value = defaultValue;
+	if (const std::string_view* text = FindValue(section, key))
+		fromString<int>(*text, value);
 	
 	return value;
 }
 
-unsigned int DataReader::ReadHex(const std::string& section, const std::string& key, unsigned int defaultValue)
+unsigned int DataReader::ReadHex(std::string_view section, std::string_view key, unsigned int defaultValue)
 {
 	unsigned value = defaultValue;
-	if (auto itSection = data.find(section); itSection != data.end())
-		if (auto itKey = itSection->second.find(key); itKey != itSection->second.end() && itKey->second.rfind("0x", 0) == 0)
-			fromString<unsigned int>(itKey->second.substr(2), value, 16);
+	if (const std::string_view* text = FindValue(section, key); text && text->rfind("0x", 0) == 0)
+		fromString<unsigned int>(text->substr(2), value, 16);
 
 	return value;
 }
 
-float DataReader::ReadFloat(const std::string& section, const std::string& key, float defaultValue)
+float DataReader::ReadFloat(std::string_view section, std::string_view key, float defaultValue)
 {
 	float value = defaultValue;
-	if (auto itSection = data.find(section); itSection != data.end())
-		if (auto itKey = itSection->second.find(key); itKey != itSection->second.end())
-			fromString<float>(itKey->second, value);
+	if (const std::string_view* text = FindValue(section, key))
+		fromString<float>(*text, value);
 
 	return value;
 }
 
-bool DataReader::ReadBoolean(const std::string &section, const std::string &key, bool defaultValue)
+bool DataReader::ReadBoolean(std::string_view section, std::string_view key, bool defaultValue)
 {
-	auto str = this->ReadString(section, key, "");
-	if (strcasecmp("true", str))
-		return true;
-	else if (strcasecmp("false", str))
-		return false;
+	if (const std::string_view* text = FindValue(section, key))
+	{
+		if (strcasecmp("true", *text))
+			return true;
+		if (strcasecmp("false", *text))
+			return false;
 
-	return this->ReadInteger(section, key, defaultValue) != 0;
-}
-
-std::string DataReader::ReadString(const std::string& section, const std::string& key, const std::string &defaultValue)
-{
-	if (auto itSection = data.find(section); itSection != data.end())
-		if (auto itKey = itSection->second.find(key); itKey != itSection->second.end())
-			return itKey->second;
+		int value = defaultValue;
+		fromString<int>(*text, value);
+		return value != 0;
+	}
 
 	return defaultValue;
 }
 
-std::vector<unsigned short> DataReader::ReadLine(const std::string& section, const std::string& key, dataTypeToRead parseType)
+std::string DataReader::ReadString(std::string_view section, std::string_view key, std::string_view defaultValue)
+{
+	if (const std::string_view* value = FindValue(section, key))
+		return std::string(*value);
+
+	return std::string(defaultValue);
+}
+
+std::vector<unsigned short> DataReader::ReadLine(std::string_view section, std::string_view key, dataTypeToRead parseType)
 {
 	static bool reachedMaxCapacity = false;
 	std::vector<unsigned short> retVector;
@@ -205,7 +267,8 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 			{
 				if (!fromString<int>(token, modelid) || modelid < 0 || modelid > 65535)
 				{
-					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), token);
+					Log::Write("Error reading key %s in [%s]: invalid model id %s\n",
+						std::string(key).c_str(), std::string(section).c_str(), token);
 					return {};
 				}
 				mInfo = CModelInfo::GetModelInfo(modelid);
@@ -272,7 +335,7 @@ std::vector<unsigned short> DataReader::ReadLine(const std::string& section, con
 	return retVector;
 }
 
-std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::string& section, const std::string& key)
+std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(std::string_view section, std::string_view key)
 {
 	std::vector<std::vector<unsigned short>> retVector;
 
@@ -295,7 +358,8 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::
 			{
 				if (!fromString<int>(token, modelid) || modelid < 0 || modelid > 65535)
 				{
-					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), token.c_str());
+					Log::Write("Error reading key %s in [%s]: invalid model id %s\n",
+						std::string(key).c_str(), std::string(section).c_str(), token.c_str());
 					return {};
 				}
 				mInfo = CModelInfo::GetModelInfo(modelid);
@@ -327,7 +391,8 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::
 				{
 					if (!fromString<int>(s, modelid) || modelid < 0 || modelid > 65535)
 					{
-						Log::Write("Error reading key %s in [%s]: invalid model id %s\n", key.c_str(), section.c_str(), s.c_str());
+						Log::Write("Error reading key %s in [%s]: invalid model id %s\n",
+							std::string(key).c_str(), std::string(section).c_str(), s.c_str());
 						return {};
 					}
 					mInfo = CModelInfo::GetModelInfo(modelid);
@@ -344,7 +409,7 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(const std::
 	return retVector;
 }
 
-std::vector<unsigned short> DataReader::ReadLineUnique(const std::string& section, const std::string& key, dataTypeToRead parseType)
+std::vector<unsigned short> DataReader::ReadLineUnique(std::string_view section, std::string_view key, dataTypeToRead parseType)
 {
 	auto vec = ReadLine(section, key, parseType);
 	vec.erase(unique(vec.begin(), vec.end()), vec.end());
