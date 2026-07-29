@@ -22,7 +22,6 @@
 #include <array>
 #include <map>
 #include <set>
-#include <stack>
 
 using namespace plugin;
 
@@ -153,8 +152,8 @@ struct tVehVars {
 
     std::set<unsigned short> vehHasVariations;
 
-    std::stack<std::pair<CVehicle*, std::array<int, 18>>> tuningStack;
-    std::stack<CVehicle*> stack;
+    std::vector<std::pair<CVehicle*, std::array<int, 18>>> tuningStack;
+    std::vector<CVehicle*> stack;
 };
 
 static tVehVars vehVars;
@@ -515,7 +514,7 @@ void processTuning(CVehicle* veh)
         }
 
         if (install)
-            vehVars.tuningStack.emplace(veh, selectedParts);
+            vehVars.tuningStack.emplace_back(veh, selectedParts);
     }
 }
 
@@ -632,10 +631,8 @@ void VehicleVariations::ClearData()
 
     vehVars.vehHasVariations.clear();
 
-    while (!vehVars.tuningStack.empty())
-        vehVars.tuningStack.pop();
-    while (!vehVars.stack.empty())
-        vehVars.stack.pop();
+    vehVars.tuningStack.clear();
+    vehVars.stack.clear();
 
     vehOptions = {};
 
@@ -1090,8 +1087,9 @@ void VehicleVariations::Process()
     
     while (!vehVars.tuningStack.empty())
     {
-        const auto it = vehVars.tuningStack.top();
-        vehVars.tuningStack.pop();
+        const auto it = vehVars.tuningStack.back();
+        vehVars.tuningStack.pop_back();
+
         if (!IsVehiclePointerValid(it.first))
             continue;
 
@@ -1133,8 +1131,8 @@ void VehicleVariations::Process()
 
     while (!vehVars.stack.empty())
     {
-        CVehicle* veh = vehVars.stack.top();
-        vehVars.stack.pop();
+        CVehicle* veh = vehVars.stack.back();
+        vehVars.stack.pop_back();
 
         if (!IsVehiclePointerValid(veh) || veh->m_nCreatedBy == eVehicleCreatedBy::MISSION_VEHICLE)
             continue;
@@ -2132,7 +2130,7 @@ __declspec(noinline) CPhysical* __fastcall CPhysicalHooked(CVehicle* _this)
 {
     const auto originalCall = captureCurrentOriginalCall();
     CPhysical* retVal = originalCall.callMethodAndReturn<CPhysical*>(_this);
-    vehVars.stack.push(_this);
+    vehVars.stack.push_back(_this);
     return retVal;
 }
 

@@ -21,7 +21,6 @@
 
 #include <array>
 #include <map>
-#include <stack>
 #include <chrono>
 
 static const char* dataFileName = "ModelVariations_Peds.ini";
@@ -49,7 +48,7 @@ struct tPedVars {
 
     std::set<unsigned short> pedHasVariations;
 
-    std::stack<CPed*> stack;
+    std::vector<CPed*> stack;
 
     std::vector<unsigned short> disableOnMission;
     std::vector<unsigned short> dontInheritBehaviourModels;
@@ -402,8 +401,8 @@ void PedVariations::Process()
 
     while (!pedVars.stack.empty())
     {
-        CPed* ped = pedVars.stack.top();
-        pedVars.stack.pop();
+        CPed* ped = pedVars.stack.back();
+        pedVars.stack.pop_back();
 
         if (IsPedPointerValid(ped) && isValidPedId(ped->m_nModelIndex))
         {
@@ -840,7 +839,7 @@ __declspec(noinline) CPhysical* __fastcall CPhysicalHooked(CPed* _this)
     const auto originalCall = captureCurrentOriginalCall();
     changedVoices.erase(_this);
     CPhysical* retVal = originalCall.callMethodAndReturn<CPhysical*>(_this);
-    pedVars.stack.push(_this);
+    pedVars.stack.push_back(_this);
     return retVal;
 }
 

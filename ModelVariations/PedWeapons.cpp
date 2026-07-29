@@ -11,7 +11,6 @@
 #include <CPed.h>
 
 #include <map>
-#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -22,7 +21,7 @@ static DataReader dataFile;
 std::unordered_map<unsigned short, std::string> wepPedModels;
 std::unordered_map<unsigned short, std::string> wepVehModels;
 
-std::stack<CPed*> pedWepStack;
+std::vector<CPed*> pedWepStack;
 
 std::vector<unsigned short> pedHasWeaponVariations;
 std::vector<std::pair<CPed*, int>> weaponWatchers;
@@ -62,7 +61,7 @@ void PedWeaponVariations::ClearData()
 {
     wepPedModels.clear();
     wepVehModels.clear();
-    pedWepStack = {};
+    pedWepStack.clear();
     pedHasWeaponVariations.clear();
     weaponWatchers.clear();
     delayedPeds.clear();
@@ -131,8 +130,8 @@ void PedWeaponVariations::Process()
 
     while (!pedWepStack.empty())
     {
-        CPed* ped = pedWepStack.top();
-        pedWepStack.pop();
+        CPed* ped = pedWepStack.back();
+        pedWepStack.pop_back();
 
         if (!IsPedPointerValid(ped))
         {
@@ -313,7 +312,7 @@ void PedWeaponVariations::Process()
     }
 
     for (auto ped : pedsToPush)
-        pedWepStack.push(ped);
+        pedWepStack.push_back(ped);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -339,7 +338,7 @@ __declspec(noinline) CPed* __fastcall CPedHooked(CPed* ped, void*, int pedType)
 {
     const auto originalCall = captureCurrentOriginalCall();
     CPed* retVal = originalCall.callMethodAndReturn<CPed*>(ped, pedType);
-    pedWepStack.push(ped);
+    pedWepStack.push_back(ped);
     return retVal;
 }
 
@@ -356,7 +355,7 @@ __declspec(noinline) void __fastcall GiveWeaponAtStartOfFightHooked(CPed* ped)
                     if (i.first == ped)
                         return originalCall.callMethod(ped);
                 
-                pedWepStack.push(ped);
+                pedWepStack.push_back(ped);
         }
 
     return originalCall.callMethod(ped);
