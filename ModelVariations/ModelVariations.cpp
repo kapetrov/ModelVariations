@@ -42,6 +42,8 @@ struct jumpInfo {
     unsigned char type;
 };
 
+char(*InitialiseRenderWareOriginal)() = reinterpret_cast<char(*)()>(0x5BD600);
+
 
 std::unordered_map<std::string, std::vector<std::string>> areas;
 std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
@@ -50,7 +52,6 @@ std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 std::set<unsigned short> referenceCountModels;
 std::set<unsigned short> addedIDsInGroups;
 
-std::string exePath(256, 0);
 std::string versionPath;
 
 std::unordered_map<unsigned short, std::string> addedIDs;
@@ -65,16 +66,12 @@ std::chrono::steady_clock::time_point loadTime;
 std::chrono::milliseconds totalTimeSinceLoad(0);
 std::chrono::milliseconds gameplayTimeSinceLoad(0);
 
-int secSinceLastModuleCheck = -1;
-
-int drawDebugText = false;
+int drawDebugText = 0;
 
 char currentZone[9] = {};
 unsigned int currentWanted = 0;
 
 bool transitioning = false;
-
-bool jumpsLogged = false;
 
 bool keyDown = false;
 
@@ -405,7 +402,7 @@ void refreshOnGameRestart()
 
     auto startTime = std::chrono::steady_clock::now();
 
-    if (!modInitialized && loadStage == 2)
+    if (!modInitialized && loadStage == 1)
         initialize();
 
     if (!modInitialized)
@@ -680,21 +677,10 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
 {
     const auto originalCall = captureCurrentOriginalCall();
 
-    int totalMemory = getMemoryUsage() / 1024 / 1024;
-
-    if (lowMemoryProtection > 0 && totalMemory > lowMemoryProtection && (enablePeds || enablePedWeapons || enableVehicles))
-    {
-        CMessages::AddMessageJumpQ("~y~Model Variations~s~: Mod disabled due to low memory. Reload manually.", 4000, 0, false);
-        reinterpret_cast<void (*)()>(0x40CF80)(); //CStreaming::RemoveAllUnusedModels
-        clearEverything();
-        enablePeds = false;
-        enablePedWeapons = false;
-        enableVehicles = false;
-    }
+    auto now = std::chrono::steady_clock::now();
 
     if (!FrontEndMenuManager->m_bMenuActive)
     {
-        auto now = std::chrono::steady_clock::now();
         if (lastTime.time_since_epoch().count() > 0)
             gameplayTimeSinceLoad += std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime);
         lastTime = now;
@@ -702,10 +688,32 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
     else
         lastTime = std::chrono::steady_clock::time_point{};
 
-    totalTimeSinceLoad = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - loadTime);
+    totalTimeSinceLoad = std::chrono::duration_cast<std::chrono::milliseconds>(now - loadTime);
+
+    if (lowMemoryProtection > 0)
+    {
+        int totalMemory = 0;
+
+        if (static int lastMemoryCheck = 0; (totalTimeSinceLoad.count() / 1000) != lastMemoryCheck)
+        {
+            lastMemoryCheck = static_cast<int>(totalTimeSinceLoad.count()) / 1000;
+            totalMemory = getMemoryUsage() / 1024 / 1024;
+        }
+
+        if (totalMemory > lowMemoryProtection && (enablePeds || enablePedWeapons || enableVehicles))
+        {
+            CMessages::AddMessageJumpQ("~y~Model Variations~s~: Mod disabled due to low memory. Reload manually.", 4000, 0, false);
+            reinterpret_cast<void (*)()>(0x40CF80)(); //CStreaming::RemoveAllUnusedModels
+            clearEverything();
+            enablePeds = false;
+            enablePedWeapons = false;
+            enableVehicles = false;
+        }
+    }
 
     originalCall.call();
 
+    static bool jumpsLogged = false;
     if (!jumpsLogged && logJumps && Log::Write("\nLogging JMP hooks...\n"))
     {
         std::unordered_map<std::string, std::vector<jumpInfo>> jumpsMap;
@@ -813,6 +821,7 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
     else
         keyDown = false;
 
+    static int secSinceLastModuleCheck = -1;
     int seconds = static_cast<int>(totalTimeSinceLoad.count() / 1000.0);
     if (enableLog && (seconds / 30) != secSinceLastModuleCheck) //every 30 seconds
     {
@@ -984,19 +993,176 @@ __declspec(noinline) void __cdecl InitialiseGameHooked()
         refreshOnGameRestart();
 }
 
-__declspec(noinline) void __cdecl InitialiseRenderWareHooked()
-{
-    const auto originalCall = captureCurrentOriginalCall();
-    originalCall.call();
-    if (loadStage == 1)
-        initialize();
-}
-
 __declspec(noinline) void __cdecl ReInitGameObjectVariablesHooked()
 {
     const auto originalCall = captureCurrentOriginalCall();
     originalCall.call();
     refreshOnGameRestart();
+}
+
+char __cdecl InitialiseRenderWareHooked()
+{
+    char retVal = InitialiseRenderWareOriginal();
+
+    if (!plugin::IsGameVersion10us())
+    {
+        MessageBox(NULL, "Error! Unsupported EXE version detected!\nThis mod supports only the US v1.0 EXE.", "Model Variations", MB_ICONERROR);
+        return retVal;
+    }
+
+    char exePath[MAX_PATH] = {};
+    GetModuleFileName(NULL, exePath, MAX_PATH-1);
+
+    char buffer[MAX_PATH] = {};
+    DWORD len = GetTempPathA(MAX_PATH, buffer);
+    if (len != 0 && len < MAX_PATH)
+    {
+        versionPath = std::string(buffer) + "version.json";
+        download_async("http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", versionPath);
+    }
+
+    iniSettings.Load(dataFileName);
+
+    trackReferenceCounts = iniSettings.ReadInteger("Settings", "TrackReferenceCounts", -1);
+    enableStreamingFix = iniSettings.ReadBoolean("Settings", "EnableStreamingFix", false);
+    lowMemoryProtection = iniSettings.ReadInteger("Settings", "LowMemoryProtection", 0);
+    loadStage = iniSettings.ReadInteger("Settings", "LoadStage", 0);
+    disableKey = iniSettings.ReadInteger("Settings", "DisableKey", 0);
+    reloadKey = iniSettings.ReadInteger("Settings", "ReloadKey", 0);
+    debugKey = iniSettings.ReadInteger("Settings", "DebugKey", 0);
+    enableLog = iniSettings.ReadBoolean("Settings", "EnableLog", false) && Log::Open("ModelVariations.log");
+    logJumps = iniSettings.ReadBoolean("Settings", "LogJumps", false);
+    debugDrawSize = iniSettings.ReadFloat("Settings", "DebugDrawSize", 0.28f);
+    debugDrawX = iniSettings.ReadFloat("Settings", "DebugDrawX", 20.0f);
+    debugDrawY = iniSettings.ReadFloat("Settings", "DebugDrawY", 340.0f);
+    debugDrawPeds = iniSettings.ReadHex("Settings", "DebugDrawPeds", 0);
+    debugDrawVehicles = iniSettings.ReadHex("Settings", "DebugDrawVehicles", 0);
+
+    std::string checkForceEnabled = iniSettings.ReadString("Settings", "ForceEnable", "");
+    if (!checkForceEnabled.empty())
+    {
+        if (checkForceEnabled == "1" || strcasecmp(checkForceEnabled, "true"))
+            forceEnableGlobal = true;
+        else if (checkForceEnabled != "0")
+        {
+            for (const auto& s : splitString(checkForceEnabled, ','))
+            {
+                std::uintptr_t value;
+                if (fromString<std::uintptr_t>(trimString(s), value, 16))
+                    forceEnable.insert(value);
+            }
+        }
+    }
+
+    if (enableLog)
+    {
+        unsigned int exeFilesize = 0;
+
+        HANDLE hFile = CreateFile(exePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile != INVALID_HANDLE_VALUE)
+        {
+            exeFilesize = GetFileSize(hFile, NULL);
+            CloseHandle(hFile);
+        }
+
+        std::string windowsVersion;
+        char str[64] = {};
+        DWORD cbData = 63;
+
+        if (RegGetValue(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild", RRF_RT_REG_SZ, NULL, str, &cbData) == ERROR_SUCCESS)
+        {
+            windowsVersion += "OS build ";
+            windowsVersion += str;
+            windowsVersion += " ";
+        }
+
+        cbData = 63;
+        if (RegGetValue(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", "PROCESSOR_ARCHITECTURE", RRF_RT_REG_SZ, NULL, str, &cbData) == ERROR_SUCCESS)
+            windowsVersion += str;
+
+
+        Log::Write("Model Variations %s %s\n", MOD_VERSION, IS_DEBUG ? "DEBUG" : "");
+        Log::Write("Build date: %s\n", __DATE__);
+        Log::Write("%s\n", windowsVersion.c_str());
+        Log::Write("%s\n\n", getDatetime(true, true, false).c_str());
+        Log::Write("%s\n", exePath);
+
+        if (isGameHOODLUM())
+            Log::Write("Supported exe detected: 1.0 US HOODLUM | %u bytes\n", exeFilesize);
+        else if (isGameCompact())
+            Log::Write("Supported exe detected: 1.0 US Compact | %u bytes\n", exeFilesize);
+        else
+            Log::Write("Unsupported exe detected: %u bytes\n", exeFilesize);
+
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        Log::Write("lpMaximumApplicationAddress = 0x%08X\n", si.lpMaximumApplicationAddress);
+
+        if (!fileExists(dataFileName))
+            Log::Write("\n%s not found!\n\n", dataFileName);
+        else
+        {
+            Log::Write("%s\n", printFilenameWithBorder(dataFileName, '#').c_str());
+            Log::Write("%s\n", fileToString(dataFileName).c_str());
+        }
+
+        PedVariations::LogDataFile();
+        PedWeaponVariations::LogDataFile();
+        VehicleVariations::LogDataFile();
+        Log::Write("\n");
+    }
+
+    const std::vector<int> sections = isGameHOODLUM() ? std::vector<int>{ 0, 1, 7, 8, 9, 10 } : std::vector<int>{ 0, 1 };
+    const std::vector<std::uintptr_t> sectionAddresses = isGameHOODLUM() ? std::vector<std::uintptr_t>{ 0x401000, 0x857000, 0xCB1000, 0x12FB000, 0x1301000, 0x1556000 } :
+                                                                           std::vector<std::uintptr_t>{ 0x401000, 0x857000 };
+
+    if (!loadOriginalExeSections(exePath, sections, sectionAddresses))
+    {
+        Log::Write("Error! Failed to retain the original executable sections. Mod initialization aborted.\n");
+        MessageBox(NULL, "Failed to load the original executable sections.", "Model Variations", MB_ICONERROR);
+        return retVal;
+    }
+
+    if (loadStage == 0)
+        initialize();
+
+    if (enableStreamingFix)
+    {
+        hookSharedCall<0x408D43, AddToLoadedVehiclesListHooked>("CStreaming::AddToLoadedVehiclesList"); //CStreaming::FinishLoadingLargeFile
+        hookSharedCall<0x40C858, AddToLoadedVehiclesListHooked>("CStreaming::AddToLoadedVehiclesList"); //CStreaming::ConvertBufferToObject
+    }
+    else
+        Log::Write("Streaming fix disabled.\n");
+
+    hookSharedCall<0x440840, InteriorManager_c__UpdateHooked>("InteriorManager_c::Update"); //CEntryExit::TransitionFinished
+    hookSharedCall<0x40E37B, RetryLoadFileHooked>("CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
+    hookSharedCall<0x440F89, TransitionFinishedHooked>("CEntryExit::TransitionFinished"); //CEntryExitManager::Update
+    hookSharedCall<0x53E293, CPopCycle__DisplayHooked>("CPopCycle::Display"); //Render2dStuff
+    hookSharedCall<0x489955, CTimer__SuspendHooked>("CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
+
+    //CFileLoader::LoadObjectTypes
+    hookSharedCall<0x5B85DD, FileLoaderLoadObject>("CFileLoader::LoadObject");
+    hookSharedCall<0x5B862C, FileLoaderLoadObject>("CFileLoader::LoadTimeObject");
+    hookSharedCall<0x5B8634, FileLoaderLoadObject>("CFileLoader::LoadWeaponObject");
+    hookSharedCall<0x5B863C, FileLoaderLoadObject>("CFileLoader::LoadClumpObject");
+    hookSharedCall<0x5B8644, FileLoaderLoadObject>("CFileLoader::LoadAnimatedClumpObject");
+    hookSharedCall<0x5B864C, FileLoaderLoadObject>("CFileLoader::LoadVehicleObject");
+    hookSharedCall<0x5B8654, FileLoaderLoadObject>("CFileLoader::LoadPedObject");
+
+    hookSharedCall<0x40F716, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
+    hookSharedCall<0x40F9F1, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
+    //hookSharedCall<0x4185AF, &RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
+    if (isGameHOODLUM())
+        hookSharedCall<0x156FB57, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+    else
+        hookSharedCall<0x40F0E7, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+
+    hookSharedCall<0x53E981, CGame__ProcessHooked>("CGame::Process"); //Idle
+    hookSharedCall<0x748E6B, CGame__ShutdownHooked>("CGame::Shutdown"); //WinMain
+    hookSharedCall<0x748CFB, InitialiseGameHooked>("InitialiseGame"); //WinMain
+    hookSharedCall<0x53C6DB, ReInitGameObjectVariablesHooked>("CGame::ReInitGameObjectVariables"); //CGame::InitialiseWhenRestarting
+
+    return retVal;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1007,164 +1173,8 @@ class ModelVariations {
 public:
     ModelVariations() {
 
-        //Create update thread here
-
-        if (!plugin::IsGameVersion10us())
-        {
-            MessageBox(NULL, "Error! Unsupported EXE version detected!\nThis mod supports only the US v1.0 EXE.", "Model Variations", MB_ICONERROR);
-            return;
-        }
-
-        GetModuleFileName(NULL, &exePath[0], 255);
-
-        char buffer[MAX_PATH] = {};
-        DWORD len = GetTempPathA(MAX_PATH, buffer);
-        if (len != 0 && len < MAX_PATH)
-        {
-            versionPath = std::string(buffer) + "version.json";
-            download_async("http://api.github.com/repos/ViperJohnGR/ModelVariations/tags", versionPath);
-        }
-
-        iniSettings.Load(dataFileName);
-
-        trackReferenceCounts = iniSettings.ReadInteger("Settings", "TrackReferenceCounts", -1);
-        enableStreamingFix = iniSettings.ReadBoolean("Settings", "EnableStreamingFix", false);
-        lowMemoryProtection = iniSettings.ReadInteger("Settings", "LowMemoryProtection", 0);
-        loadStage = iniSettings.ReadInteger("Settings", "LoadStage", 1);
-        disableKey = iniSettings.ReadInteger("Settings", "DisableKey", 0);
-        reloadKey = iniSettings.ReadInteger("Settings", "ReloadKey", 0);
-        debugKey = iniSettings.ReadInteger("Settings", "DebugKey", 0);
-        enableLog = iniSettings.ReadBoolean("Settings", "EnableLog", false) && Log::Open("ModelVariations.log");
-        logJumps = iniSettings.ReadBoolean("Settings", "LogJumps", false);
-        debugDrawSize = iniSettings.ReadFloat("Settings", "DebugDrawSize", 0.28f);
-        debugDrawX = iniSettings.ReadFloat("Settings", "DebugDrawX", 20.0f);
-        debugDrawY = iniSettings.ReadFloat("Settings", "DebugDrawY", 340.0f);
-        debugDrawPeds = iniSettings.ReadHex("Settings", "DebugDrawPeds", 0);
-        debugDrawVehicles = iniSettings.ReadHex("Settings", "DebugDrawVehicles", 0);
-
-        std::string checkForceEnabled = iniSettings.ReadString("Settings", "ForceEnable", "");
-        if (!checkForceEnabled.empty())
-        {
-            if (checkForceEnabled == "1" || strcasecmp(checkForceEnabled, "true"))
-                forceEnableGlobal = true;
-            else if (checkForceEnabled != "0")
-            {
-                for (const auto& s : splitString(checkForceEnabled, ','))
-                {
-                    std::uintptr_t value;
-                    if (fromString<std::uintptr_t>(trimString(s), value, 16))
-                        forceEnable.insert(value);
-                }
-            }
-        }
-
-        if (enableLog)
-        {
-            unsigned int exeFilesize = 0;
-
-            HANDLE hFile = CreateFile(exePath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (hFile != INVALID_HANDLE_VALUE)
-            {
-                exeFilesize = GetFileSize(hFile, NULL);
-                CloseHandle(hFile);
-            }
-
-            std::string windowsVersion;
-            char str[64] = {};
-            DWORD cbData = 63;
-    
-            if (RegGetValue(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentBuild", RRF_RT_REG_SZ, NULL, str, &cbData) == ERROR_SUCCESS)
-            {
-                windowsVersion += "OS build ";
-                windowsVersion += str;
-                windowsVersion += " ";
-            }
-
-            cbData = 63;
-            if (RegGetValue(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", "PROCESSOR_ARCHITECTURE", RRF_RT_REG_SZ, NULL, str, &cbData) == ERROR_SUCCESS)
-                    windowsVersion += str;
-
-
-            Log::Write("Model Variations %s %s\n", MOD_VERSION, IS_DEBUG ? "DEBUG" : "");
-            Log::Write("Build date: %s\n", __DATE__);
-            Log::Write("%s\n", windowsVersion.c_str());
-            Log::Write("%s\n\n", getDatetime(true, true, false).c_str());
-            Log::Write("%s\n", exePath.c_str());
-
-            if (isGameHOODLUM())
-                Log::Write("Supported exe detected: 1.0 US HOODLUM | %u bytes\n", exeFilesize);
-            else if (isGameCompact())
-                Log::Write("Supported exe detected: 1.0 US Compact | %u bytes\n", exeFilesize);
-            else
-                Log::Write("Unsupported exe detected: %u bytes\n", exeFilesize);
-            
-            SYSTEM_INFO si;
-            GetSystemInfo(&si);
-            Log::Write("lpMaximumApplicationAddress = 0x%08X\n", si.lpMaximumApplicationAddress);
-
-            if (!fileExists(dataFileName))
-                Log::Write("\n%s not found!\n\n", dataFileName);
-            else
-            {
-                Log::Write("%s\n", printFilenameWithBorder(dataFileName, '#').c_str());
-                Log::Write("%s\n", fileToString(dataFileName).c_str());
-            }
-
-            PedVariations::LogDataFile();
-            PedWeaponVariations::LogDataFile();
-            VehicleVariations::LogDataFile();
-            Log::Write("\n");
-        }
-
-        const std::vector<int> sections = isGameHOODLUM() ? std::vector<int>{ 0, 1, 7, 8, 9, 10 } : std::vector<int>{ 0, 1 };
-        const std::vector<std::uintptr_t> sectionAddresses = isGameHOODLUM() ? std::vector<std::uintptr_t>{ 0x401000, 0x857000, 0xCB1000, 0x12FB000, 0x1301000, 0x1556000 } : 
-                                                                               std::vector<std::uintptr_t>{ 0x401000, 0x857000 };
-
-        if (!loadOriginalExeSections(exePath.c_str(), sections, sectionAddresses))
-        {
-            Log::Write("Error! Failed to retain the original executable sections. Mod initialization aborted.\n");
-            MessageBox(NULL, "Failed to load the original executable sections.", "Model Variations", MB_ICONERROR);
-            return;
-        }
-
-        if (loadStage == 0)
-            initialize();
-
-        if (enableStreamingFix)
-        {
-            hookSharedCall<0x408D43, AddToLoadedVehiclesListHooked>("CStreaming::AddToLoadedVehiclesList"); //CStreaming::FinishLoadingLargeFile
-            hookSharedCall<0x40C858, AddToLoadedVehiclesListHooked>("CStreaming::AddToLoadedVehiclesList"); //CStreaming::ConvertBufferToObject
-        }
-        else
-            Log::Write("Streaming fix disabled.\n");
-
-        hookSharedCall<0x440840, InteriorManager_c__UpdateHooked>("InteriorManager_c::Update"); //CEntryExit::TransitionFinished
-        hookSharedCall<0x40E37B, RetryLoadFileHooked>("CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
-        hookSharedCall<0x440F89, TransitionFinishedHooked>("CEntryExit::TransitionFinished"); //CEntryExitManager::Update
-        hookSharedCall<0x53E293, CPopCycle__DisplayHooked>("CPopCycle::Display"); //Render2dStuff
-        hookSharedCall<0x489955, CTimer__SuspendHooked>("CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
-
-        //CFileLoader::LoadObjectTypes
-        hookSharedCall<0x5B85DD, FileLoaderLoadObject>("CFileLoader::LoadObject");
-        hookSharedCall<0x5B862C, FileLoaderLoadObject>("CFileLoader::LoadTimeObject");
-        hookSharedCall<0x5B8634, FileLoaderLoadObject>("CFileLoader::LoadWeaponObject");
-        hookSharedCall<0x5B863C, FileLoaderLoadObject>("CFileLoader::LoadClumpObject");
-        hookSharedCall<0x5B8644, FileLoaderLoadObject>("CFileLoader::LoadAnimatedClumpObject");
-        hookSharedCall<0x5B864C, FileLoaderLoadObject>("CFileLoader::LoadVehicleObject");
-        hookSharedCall<0x5B8654, FileLoaderLoadObject>("CFileLoader::LoadPedObject");
-
-        hookSharedCall<0x40F716, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
-        hookSharedCall<0x40F9F1, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
-        //hookSharedCall<0x4185AF, &RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
-        if (isGameHOODLUM())
-            hookSharedCall<0x156FB57, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
-        else
-            hookSharedCall<0x40F0E7, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
-
-        hookSharedCall<0x53E981, CGame__ProcessHooked>("CGame::Process"); //Idle
-        hookSharedCall<0x748E6B, CGame__ShutdownHooked>("CGame::Shutdown"); //WinMain
-        hookSharedCall<0x748CFB, InitialiseGameHooked>("InitialiseGame"); //WinMain
-        hookSharedCall<0x5BF3A1, InitialiseRenderWareHooked>("CGame::InitialiseRenderWare"); //RwInitialize
-        hookSharedCall<0x53C6DB, ReInitGameObjectVariablesHooked>("CGame::ReInitGameObjectVariables"); //CGame::InitialiseWhenRestarting
+        InitialiseRenderWareOriginal = injector::MakeCALL(0x5BF3A1, InitialiseRenderWareHooked, true).get();
+        FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<const void*>(0x5BF3A1), 5);
+ 
     }
 } modelVariations;
