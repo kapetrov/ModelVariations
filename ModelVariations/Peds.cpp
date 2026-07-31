@@ -142,7 +142,32 @@ bool canPedDriveVeh(int pedModel, int vehModel)
 
 void PedVariations::ClearData()
 {
-    pedVars = {};
+    pedVars.variations.clear();
+    pedVars.wantedVariations.clear();
+    pedVars.missionVariations.clear();
+    pedVars.currentVariations.clear();
+    pedVars.timeGroups.clear();
+    pedVars.activeTimeGroups.clear();
+
+
+    pedVars.originalModels.clear();
+    pedVars.useParentVoice.clear();
+    pedVars.voices.clear();
+    pedVars.animGroups.clear();
+    pedVars.weatherSunny.clear();
+    pedVars.weatherRainy.clear();
+    pedVars.weatherFoggy.clear();
+    pedVars.weatherSandstorm.clear();
+    pedVars.weatherWindy.clear();
+
+    pedVars.pedHasVariations.clear();
+
+    pedVars.stack.clear();
+
+    pedVars.disableOnMission.clear();
+    pedVars.dontInheritBehaviourModels.clear();
+    pedVars.mergeInteriors.clear();
+
     pedOptions = {};
 
     dataFile.Clear();
