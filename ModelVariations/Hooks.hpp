@@ -5,7 +5,6 @@
 #include <set>
 #include <span>
 #include <type_traits>
-#include <utility>
 
 
 #include <injector/assembly.hpp>
@@ -45,11 +44,8 @@ struct SharedCallHookState {
 };
 
 extern SharedCallHookState* currentSharedCallHook;
-
-template <std::uintptr_t address>
-struct SharedCallHookSlot {
-    static inline SharedCallHookState state{ address, nullptr };
-};
+__declspec(noinline) SharedCallHookState* __fastcall hookSharedCallImpl(std::uintptr_t address, void* target, const char* name, bool isVTableAddress);
+__declspec(noinline) void* __fastcall createSharedCallThunkImpl(SharedCallHookState* state, void* target) noexcept;
 
 struct CapturedOriginalCall {
     std::uintptr_t address;
@@ -102,35 +98,22 @@ inline CapturedOriginalCall captureCurrentOriginalCall() noexcept
     return {};
 }
 
-template <std::uintptr_t address, auto Target, typename Signature = decltype(Target)>
-struct GeneratedCallThunk;
-
-template <std::uintptr_t address, auto Target, typename Ret, typename... Args>
-struct GeneratedCallThunk<address, Target, Ret(__cdecl*)(Args...)> {
-    static Ret __cdecl invoke(Args... args)
-    {
-        currentSharedCallHook = &SharedCallHookSlot<address>::state;
-        return Target(std::forward<Args>(args)...);
-    }
-};
-
-template <std::uintptr_t address, auto Target, typename Ret, typename... Args>
-struct GeneratedCallThunk<address, Target, Ret(__fastcall*)(Args...)> {
-    static Ret __fastcall invoke(Args... args)
-    {
-        currentSharedCallHook = &SharedCallHookSlot<address>::state;
-        return Target(std::forward<Args>(args)...);
-    }
-};
-
 template <std::uintptr_t address, auto Target>
-void hookSharedCall(const char* name, bool isVTableAddress = false)
+__forceinline SharedCallHookState* hookSharedCall(const char* name, bool isVTableAddress = false)
 {
-    using Thunk = GeneratedCallThunk<address, Target>;
+    using TargetType = decltype(Target);
+    static_assert(std::is_pointer_v<TargetType> && std::is_function_v<std::remove_pointer_t<TargetType>>, "Hook destination must be a function pointer");
 
-    void* changedFunction = reinterpret_cast<void*>(&Thunk::invoke);
-    if (void* originalFunction = hookCallImpl(address, changedFunction, name, isVTableAddress))
-        SharedCallHookSlot<address>::state.originalFunction = originalFunction;
+    return hookSharedCallImpl(address, reinterpret_cast<void*>(Target), name, isVTableAddress);
+}
+
+template <auto Target>
+__forceinline decltype(Target) createSharedCallThunk(SharedCallHookState& state) noexcept
+{
+    using TargetType = decltype(Target);
+    static_assert(std::is_pointer_v<TargetType> && std::is_function_v<std::remove_pointer_t<TargetType>>, "Thunk destination must be a function pointer");
+
+    return reinterpret_cast<TargetType>(createSharedCallThunkImpl(&state, reinterpret_cast<void*>(Target)));
 }
 
 template <std::uintptr_t address, typename Function>

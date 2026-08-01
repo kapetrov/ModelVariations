@@ -2147,26 +2147,21 @@ __declspec(noinline) void __fastcall AddAudioEventHooked(CAEVehicleAudioEntity* 
     }
 }
 
-void CWorld__RemoveHooked_impl(CVehicle* truck)
+__declspec(noinline) void __cdecl CWorld__RemoveHooked(CVehicle* entity)
 {
-    if (truck)
+    const auto originalCall = captureCurrentOriginalCall();
+    if (entity)
     {
-        auto it = spawnedTrailers.find(truck);
+        auto it = spawnedTrailers.find(entity);
         if (it != spawnedTrailers.end())
         {
             for (auto trailer : it->second)
-                if (IsVehiclePointerValid(trailer) && getDistanceFromVeh(truck, trailer) < 22.0f)
+                if (IsVehiclePointerValid(trailer) && getDistanceFromVeh(entity, trailer) < 22.0f)
                     destroyVehicleAndOccupants(trailer);
 
             spawnedTrailers.erase(it);
         }
     }
-}
-
-__declspec(noinline) void __cdecl CWorld__RemoveHooked(CVehicle* entity)
-{
-    const auto originalCall = captureCurrentOriginalCall();
-    CWorld__RemoveHooked_impl(entity);
 
     originalCall.call(entity);
 }
@@ -2696,7 +2691,7 @@ isCopBike:
     }
 }
 
-auto RegisterCoronaHookedPointer = &GeneratedCallThunk<0x6ABA60, &RegisterCoronaHooked<true>>::invoke;
+decltype(&RegisterCoronaHooked<true>) RegisterCoronaHookedPointer = nullptr;
 void __declspec(naked) patchCoronas()
 {
     __asm {
@@ -3055,12 +3050,16 @@ void VehicleVariations::InstallHooks()
 
     if (vehOptions.enableLights)
     {
-        hookSharedCall<0x6ABA60, RegisterCoronaHooked<false>>("CCoronas::RegisterCorona"); //CAutomobile::PreRender
+        SharedCallHookState* const registerCoronaState = hookSharedCall<0x6ABA60, RegisterCoronaHooked<false>>("CCoronas::RegisterCorona"); //CAutomobile::PreRender
         hookSharedCall<0x6ABB35, RegisterCoronaHooked<false>>("CCoronas::RegisterCorona"); //CAutomobile::PreRender
         hookSharedCall<0x6ABC69, RegisterCoronaHooked<false>>("CCoronas::RegisterCorona"); //CAutomobile::PreRender
-        if (memoryMatchesOriginalExe(0x6ABA56, 5) || forceEnableGlobal || forceEnable.contains(0x6ABA56))
+
+        if (registerCoronaState)
+            RegisterCoronaHookedPointer = createSharedCallThunk<&RegisterCoronaHooked<true>>(*registerCoronaState);
+
+        if (RegisterCoronaHookedPointer && (memoryMatchesOriginalExe(0x6ABA56, 5) || forceEnableGlobal || forceEnable.contains(0x6ABA56)))
             injector::MakeJMP(0x6ABA56, patchCoronas);
-        else
+        else if (RegisterCoronaHookedPointer)
             Log::LogModifiedAddress(0x6ABA56, "Modified method detected: CAutomobile::PreRender - 0x6ABA56 is %s\n", bytesToString(0x6ABA56, 5).c_str());
 
         hookSharedCall<0x6AB80F, AddLightHooked>("CPointLights::AddLight"); //CAutomobile::PreRender
