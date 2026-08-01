@@ -44,8 +44,6 @@ struct jumpInfo {
 
 char(*InitialiseRenderWareOriginal)() = reinterpret_cast<char(*)()>(0x5BD600);
 
-
-std::unordered_map<std::string, std::vector<std::string>> areas;
 std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 
 
@@ -944,6 +942,8 @@ __declspec(noinline) void __cdecl InitialiseGameHooked()
 {
     const auto originalCall = captureCurrentOriginalCall();
     originalCall.call();
+
+    std::unordered_map<std::string, std::vector<std::string>> areas;
 
     Log::Write("-- InitialiseGame Start (%s) --\n", getDatetime(false, true, true).c_str());
 

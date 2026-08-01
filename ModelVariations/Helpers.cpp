@@ -300,18 +300,28 @@ std::string getFilenameFromPath(const std::string& path)
     return path.substr(path.find_last_of("/\\") + 1);
 }
 
-bool strcasestr(std::string src, std::string sub)
+bool strcasestr(std::string_view src, std::string_view sub)
 {
-    std::for_each(src.begin(), src.end(), [](char& c) {
-        c = toUpper(c);
-        });
-
-    std::for_each(sub.begin(), sub.end(), [](char& c) {
-        c = toUpper(c);
-        });
-
-    if (src.find(sub) != std::string::npos)
+    if (sub.empty())
         return true;
+
+    if (sub.size() > src.size())
+        return false;
+
+    const char first = toUpper(sub.front());
+
+    for (std::size_t start = 0; start <= src.size() - sub.size(); ++start)
+    {
+        if (toUpper(src[start]) != first)
+            continue;
+
+        std::size_t i = 1;
+        while (i < sub.size() && toUpper(src[start + i]) == toUpper(sub[i]))
+            ++i;
+
+        if (i == sub.size())
+            return true;
+    }
 
     return false;
 }

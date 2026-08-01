@@ -49,7 +49,7 @@ char toUpper(char c);
 std::string bytesToString(std::uintptr_t address, unsigned int nBytes);
 std::string fileToString(const std::string& filename);
 std::string getFilenameFromPath(const std::string& path);
-bool strcasestr(std::string src, std::string sub);
+bool strcasestr(std::string_view src, std::string_view sub);
 bool strcasecmp(std::string_view s1, std::string_view s2);
 std::vector<std::string> splitString(const std::string& s, char separator);
 std::vector<std::string> splitString(const std::string& s, const std::string& separators);

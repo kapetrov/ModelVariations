@@ -131,7 +131,7 @@ int DataReader::ReadInteger(std::string_view section, std::string_view key, int 
 unsigned int DataReader::ReadHex(std::string_view section, std::string_view key, unsigned int defaultValue)
 {
 	unsigned value = defaultValue;
-	if (const std::string_view* text = FindValue(section, key); text && text->rfind("0x", 0) == 0)
+	if (const std::string_view* text = FindValue(section, key); text && (*text)[0] == '0' && (*text)[1] == 'x')
 		fromString<unsigned int>(text->substr(2), value, 16);
 
 	return value;
@@ -267,8 +267,7 @@ std::vector<unsigned short> DataReader::ReadLine(std::string_view section, std::
 			{
 				if (!fromString<int>(token, modelid) || modelid < 0 || modelid > 65535)
 				{
-					Log::Write("Error reading key %s in [%s]: invalid model id %s\n",
-						std::string(key).c_str(), std::string(section).c_str(), token);
+					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", std::string(key).c_str(), std::string(section).c_str(), token);
 					return {};
 				}
 				mInfo = CModelInfo::GetModelInfo(modelid);
@@ -358,8 +357,7 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(std::string
 			{
 				if (!fromString<int>(token, modelid) || modelid < 0 || modelid > 65535)
 				{
-					Log::Write("Error reading key %s in [%s]: invalid model id %s\n",
-						std::string(key).c_str(), std::string(section).c_str(), token.c_str());
+					Log::Write("Error reading key %s in [%s]: invalid model id %s\n", std::string(key).c_str(), std::string(section).c_str(), token.c_str());
 					return {};
 				}
 				mInfo = CModelInfo::GetModelInfo(modelid);
@@ -391,8 +389,7 @@ std::vector<std::vector<unsigned short>> DataReader::ReadTrailerLine(std::string
 				{
 					if (!fromString<int>(s, modelid) || modelid < 0 || modelid > 65535)
 					{
-						Log::Write("Error reading key %s in [%s]: invalid model id %s\n",
-							std::string(key).c_str(), std::string(section).c_str(), s.c_str());
+						Log::Write("Error reading key %s in [%s]: invalid model id %s\n", std::string(key).c_str(), std::string(section).c_str(), s.c_str());
 						return {};
 					}
 					mInfo = CModelInfo::GetModelInfo(modelid);
