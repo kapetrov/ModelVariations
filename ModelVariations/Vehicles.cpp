@@ -2235,23 +2235,17 @@ __declspec(noinline) void __fastcall UpdateClumpAlphaHooked(CVehicle* _this)
     originalCall.callMethod(_this);
 }
 
-__declspec(noinline) void __cdecl SetClumpAlphaHooked(void* a1, void* a2)
+__declspec(noinline) void __cdecl SetClumpAlphaHooked(void* clump, int alpha)
 {
     const auto originalCall = captureCurrentOriginalCall();
 
-    if (!isAddressValid(a1))
+    if (!isAddressValid(clump))
     {
-        Log::Write("SetClumpAlphaHooked Error! a1 is invalid (0x%X).\n", a1);
+        Log::Write("SetClumpAlphaHooked Error! clump is invalid (0x%X).\n", clump);
         return;
     }
 
-    if (a2 && !isAddressValid(a2))
-    {
-        Log::Write("SetClumpAlphaHooked Error! a1 is (0x%X) a2 is invalid (0x%X).\n", a1, a2);
-        return;
-    }
-
-    originalCall.call(a1, a2);
+    originalCall.call(clump, alpha);
 }
 
 //changeScriptedCars
@@ -3007,30 +3001,31 @@ void VehicleVariations::InstallHooks()
     //Tuning for parked cars
     hookSharedCall<0x6F3C8C, CWorld__AddHooked>("CWorld::Add"); //CCarGenerator::DoInternalProcessing
 
-    /////////////////////// NULL GUARDS ///////////////////////
-    x4306A1_Destination = injector::GetBranchDestination(0x4306A1).as_int();
-    if (isAddressValid(x4306A1_Destination))
-        hookASM(0x4306A1, 0, patch4306A1, "CCarCtrl::GenerateOneRandomCar");
+    if (enableNullGuards)
+    {
+        x4306A1_Destination = injector::GetBranchDestination(0x4306A1).as_int();
+        if (isAddressValid(x4306A1_Destination))
+            hookASM(0x4306A1, 0, patch4306A1, "CCarCtrl::GenerateOneRandomCar");
 
-    hookSharedCall<0x6A078A, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::SetupModelNodes
-    hookSharedCall<0x6A65B4, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::SetModelIndex
-    hookSharedCall<0x6B0B92, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::CAutomobile
-    hookSharedCall<0x6B597A, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::SetupModelNodes
-    hookSharedCall<0x6B8994, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::SetModelIndex
-    hookSharedCall<0x6BF50D, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::CBike
-    hookSharedCall<0x6F01BA, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBoat::SetupModelNodes
-    hookSharedCall<0x6F2A1D, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBoat::CBoat
-    hookSharedCall<0x6F5554, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CTrain::SetModelIndex
-    hookSharedCall<0x6F60D1, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CTrain::CTrain
+        hookSharedCall<0x6A078A, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::SetupModelNodes
+        hookSharedCall<0x6A65B4, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::SetModelIndex
+        hookSharedCall<0x6B0B92, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CAutomobile::CAutomobile
+        hookSharedCall<0x6B597A, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::SetupModelNodes
+        hookSharedCall<0x6B8994, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::SetModelIndex
+        hookSharedCall<0x6BF50D, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBike::CBike
+        hookSharedCall<0x6F01BA, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBoat::SetupModelNodes
+        hookSharedCall<0x6F2A1D, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CBoat::CBoat
+        hookSharedCall<0x6F5554, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CTrain::SetModelIndex
+        hookSharedCall<0x6F60D1, FillFrameArrayHooked>("CClumpModelInfo::FillFrameArray"); //CTrain::CTrain
 
-    hookSharedCall<0x6BF768, SetupSuspensionLinesHooked>("CBike::SetupSuspensionLines"); //CBike::CBike
+        hookSharedCall<0x6BF768, SetupSuspensionLinesHooked>("CBike::SetupSuspensionLines"); //CBike::CBike
 
-    hookSharedCall<0x6B19F2, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CAutomobile::ProcessControl
-    hookSharedCall<0x6B92F5, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CBike::ProcessControl
-    hookSharedCall<0x6F185D, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CBoat::ProcessControl
+        hookSharedCall<0x6B19F2, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CAutomobile::ProcessControl
+        hookSharedCall<0x6B92F5, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CBike::ProcessControl
+        hookSharedCall<0x6F185D, UpdateClumpAlphaHooked>("CVehicle::UpdateClumpAlpha"); //CBoat::ProcessControl
 
-    hookSharedCall<0x6F3DF2, SetClumpAlphaHooked>("CVisibilityPlugins::SetClumpAlpha"); //CCarGenerator::DoInternalProcessing
-    /////////////////////// NULL GUARDS END ///////////////////////
+        hookSharedCall<0x6F3DF2, SetClumpAlphaHooked>("CVisibilityPlugins::SetClumpAlpha"); //CCarGenerator::DoInternalProcessing
+    }
 
     if (vehOptions.changeScriptedCars)
         hookSharedCall<0x467B01, CreateCarForScriptHooked>("CCarCtrl::CreateCarForScript"); //00A5: CREATE_CAR

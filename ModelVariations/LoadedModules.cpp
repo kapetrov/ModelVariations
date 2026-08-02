@@ -7,7 +7,7 @@
 
 #include <ntstatus.h>
 
-std::map<loadedModNames, bool> loadedMods;
+std::array<bool, 2> loadedMods;
 std::vector<std::pair<std::string, MODULEINFO>> loadedModules;
 std::string modDirectory;
 

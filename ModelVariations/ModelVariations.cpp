@@ -89,6 +89,7 @@ bool enableVehicles = false;
 bool enablePedWeapons = false;
 bool forceEnableGlobal = false;
 bool enableStreamingFix = false;
+bool enableNullGuards = false;
 int lowMemoryProtection = 3300;
 int loadStage = 1;
 int trackReferenceCounts = -1;
@@ -1023,6 +1024,7 @@ char __cdecl InitialiseRenderWareHooked()
 
     iniSettings.Load(dataFileName);
 
+    enableNullGuards = iniSettings.ReadBoolean("Settings", "EnableNullGuards", false);
     trackReferenceCounts = iniSettings.ReadInteger("Settings", "TrackReferenceCounts", -1);
     enableStreamingFix = iniSettings.ReadBoolean("Settings", "EnableStreamingFix", false);
     lowMemoryProtection = iniSettings.ReadInteger("Settings", "LowMemoryProtection", 0);
