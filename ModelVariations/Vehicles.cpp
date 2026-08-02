@@ -579,7 +579,7 @@ int getRandomVariation(const int modelid, bool parked = false)
     {
         if (auto loadState = loadModel(variationModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
         {
-            Log::Write("Error loading vehicle model %d (%s) %s\n", variationModel, modelNames.contains(variationModel) ? modelNames[variationModel].c_str() : "", getLoadStateString(loadState).c_str());
+            Log::Write("Error loading vehicle model %d (%s) %s\n", variationModel, modelNames.contains(variationModel) ? modelNames[variationModel].c_str() : "", getLoadStateString(loadState));
             return modelid;
         }
 
@@ -1109,14 +1109,14 @@ void VehicleVariations::Process()
                         auto partLoadState = CStreamingInfo__ms_pArrayBase[part].m_nLoadState;
                         
                         if (partLoadState != LOADSTATE_LOADED)
-                            Log::Write("Error loading (%s) tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(partLoadState).c_str(), part, modelNames.contains(part) ? modelNames[part].c_str() : "", it.first->m_nModelIndex);
+                            Log::Write("Error loading (%s) tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(partLoadState), part, modelNames.contains(part) ? modelNames[part].c_str() : "", it.first->m_nModelIndex);
                         else
                         {
                             short otherUpgrade = CVehicleModelInfo__CLinkedUpgradeList__FindOtherUpgrade(CVehicleModelInfo__ms_linkedUpgrades, part);
                             unsigned char pairLoadState = otherUpgrade > -1 ? CStreamingInfo__ms_pArrayBase[otherUpgrade].m_nLoadState : LOADSTATE_NOT_LOADED;
                             if (otherUpgrade > -1 && pairLoadState != LOADSTATE_LOADED)
                             {
-                                Log::Write("Error loading (%s) pair tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(pairLoadState).c_str(), otherUpgrade, modelNames.contains(otherUpgrade) ? modelNames[otherUpgrade].c_str() : "", it.first->m_nModelIndex);
+                                Log::Write("Error loading (%s) pair tuning part model %d (%s) for vehicle id %u\n", getLoadStateString(pairLoadState), otherUpgrade, modelNames.contains(otherUpgrade) ? modelNames[otherUpgrade].c_str() : "", it.first->m_nModelIndex);
                                 continue;
                             }
                             it.first->AddVehicleUpgrade(part);
@@ -1202,7 +1202,7 @@ void VehicleVariations::Process()
                 {
                     if (auto loadState = loadModel(trailerModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
                     {
-                        Log::Write("Error loading vehicle model %d (%s) %s\n", trailerModel, modelNames.contains(trailerModel) ? modelNames[trailerModel].c_str() : "", getLoadStateString(loadState).c_str());
+                        Log::Write("Error loading vehicle model %d (%s) %s\n", trailerModel, modelNames.contains(trailerModel) ? modelNames[trailerModel].c_str() : "", getLoadStateString(loadState));
                         break;
                     }
 
@@ -1655,7 +1655,7 @@ __declspec(noinline) CHeli* __cdecl GenerateHeliHooked(CPed* ped, char newsHeli)
         unsigned short heliModel = newsHeli ? 488U : 497U;
 
         if (auto loadState = loadModel(heliModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
-            Log::Write("Error loading vehicle model %d (%s) %s\n", heliModel, modelNames.contains(heliModel) ? modelNames[heliModel].c_str() : "", getLoadStateString(loadState).c_str());
+            Log::Write("Error loading vehicle model %d (%s) %s\n", heliModel, modelNames.contains(heliModel) ? modelNames[heliModel].c_str() : "", getLoadStateString(loadState));
     }
 
     return originalCall.callAndReturn<CHeli*>(ped, newsHeli);
@@ -1764,7 +1764,7 @@ __declspec(noinline) CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int 
             auto driver = vectorGetRandom(it->second);
             if (auto loadState = loadModel(driver, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
             {
-                Log::Write("Error loading ped model %d (%s) %s\n", driver, modelNames.contains(driver) ? modelNames[driver].c_str() : "", getLoadStateString(loadState).c_str());
+                Log::Write("Error loading ped model %d (%s) %s\n", driver, modelNames.contains(driver) ? modelNames[driver].c_str() : "", getLoadStateString(loadState));
                 roadblockDriver = 0;
                 return originalCall.callMethodAndReturn<CCopPed*>(ped, copType);
             }
@@ -1880,7 +1880,7 @@ __declspec(noinline) CPed* __cdecl AddPedHooked(unsigned int pedType, int modelI
             }
         }
         else
-            Log::Write("Error loading ped model %d (%s) %s\n", occupantModelIndex, modelNames.contains((unsigned short)occupantModelIndex) ? modelNames[(unsigned short)occupantModelIndex].c_str() : "", getLoadStateString(loadState).c_str());
+            Log::Write("Error loading ped model %d (%s) %s\n", occupantModelIndex, modelNames.contains((unsigned short)occupantModelIndex) ? modelNames[(unsigned short)occupantModelIndex].c_str() : "", getLoadStateString(loadState));
 
         CPed* ped = originalCall.callAndReturn<CPed*>(pedType, modelIndex, posn, unknown);
         occupantModelIndex = -1;
@@ -2044,7 +2044,7 @@ __declspec(noinline) void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _t
 
         Log::Write("model=%d key=0x%08X state=%s flags=0x%02X img=%u cdPos=%u cdSize=%u next=%d prev=%d\n", index,
                                                                                                             _this->m_nKey,
-                                                                                                            getLoadStateString(streamingInfo.m_nLoadState).c_str(),
+                                                                                                            getLoadStateString(streamingInfo.m_nLoadState),
                                                                                                             streamingInfo.m_nFlags,
                                                                                                             streamingInfo.m_nImgId,
                                                                                                             streamingInfo.m_nCdPosn,
@@ -2079,7 +2079,7 @@ __declspec(noinline) void* __fastcall CreateInstanceHooked(CVehicleModelInfo* _t
                      "Times used: %u\n"
                      "Vehicles: %u/%u\n"
                      "VehicleStructs: %u/%u\n"
-                     "Streaming memory: %u/%u MB", index, getLoadStateString(streamingInfo.m_nLoadState).c_str(), _this->m_nRefCount, _this->m_nTimesUsed,
+                     "Streaming memory: %u/%u MB", index, getLoadStateString(streamingInfo.m_nLoadState), _this->m_nRefCount, _this->m_nTimesUsed,
                                                    CPools::ms_pVehiclePool->GetNoOfUsedSpaces(), CPools::ms_pVehiclePool->m_nSize, 
                                                    CVehicleModelInfo__CVehicleStructure__m_pInfoPool->GetNoOfUsedSpaces(),
                                                    CVehicleModelInfo__CVehicleStructure__m_pInfoPool->m_nSize,

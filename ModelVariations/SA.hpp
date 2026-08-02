@@ -103,18 +103,18 @@ inline short CVehicleModelInfo__CLinkedUpgradeList__FindOtherUpgrade(uint32_t* _
 
 #define vsnprintf_SA reinterpret_cast<int(__cdecl*)(char*, size_t, const char*, va_list)>(0x825BD3)
 
-inline std::string getLoadStateString(unsigned char loadState)
+inline const char* getLoadStateString(unsigned char loadState)
 {
     switch (loadState)
     {
-    case LOADSTATE_NOT_LOADED: return "LOADSTATE_NOT_LOADED";
-    case LOADSTATE_LOADED: return "LOADSTATE_LOADED";
-    case LOADSTATE_Requested: return "LOADSTATE_REQUESTED";
-    case LOADSTATE_Channeled: return "LOADSTATE_CHANNELED";
-    case LOADSTATE_Finishing: return "LOADSTATE_FINISHING";
+        case LOADSTATE_NOT_LOADED: return "LOADSTATE_NOT_LOADED";
+        case LOADSTATE_LOADED: return "LOADSTATE_LOADED";
+        case LOADSTATE_Requested: return "LOADSTATE_REQUESTED";
+        case LOADSTATE_Channeled: return "LOADSTATE_CHANNELED";
+        case LOADSTATE_Finishing: return "LOADSTATE_FINISHING";
     };
 
-    return std::to_string(loadState);
+    return "UNKNOWN LOADSTATE";
 }
 
 inline unsigned char loadModel(int model, int streamingFlags, bool loadImmediately)

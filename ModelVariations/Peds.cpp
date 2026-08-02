@@ -790,7 +790,7 @@ __declspec(noinline) void __fastcall SetModelIndexHooked(CEntity* _this, void*, 
         {
             if (auto loadState = loadModel(newModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
             {
-                Log::Write("Error loading ped model %d (%s) %s. Using original model %d.\n", newModel, modelNames.contains(newModel) ? modelNames[newModel].c_str() : "", getLoadStateString(loadState).c_str(), index);
+                Log::Write("Error loading ped model %d (%s) %s. Using original model %d.\n", newModel, modelNames.contains(newModel) ? modelNames[newModel].c_str() : "", getLoadStateString(loadState), index);
                 return originalCall.callMethod(_this, index);
             }
                     
@@ -953,7 +953,7 @@ __declspec(noinline) int __cdecl ChooseCivilianOccupationForVehicleHooked(char m
                     if (auto loadState = loadModel(i, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
                     {
                         auto modelName = modelNames.find(static_cast<unsigned short>(i));
-                        Log::Write("Error loading ped model %d (%s) %s.\n", i, modelName != modelNames.end() ? modelName->second.c_str() : "", getLoadStateString(loadState).c_str());
+                        Log::Write("Error loading ped model %d (%s) %s.\n", i, modelName != modelNames.end() ? modelName->second.c_str() : "", getLoadStateString(loadState));
                     }
                     else
                         return i;
