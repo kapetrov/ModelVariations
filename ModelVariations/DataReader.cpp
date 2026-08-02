@@ -131,7 +131,7 @@ int DataReader::ReadInteger(std::string_view section, std::string_view key, int 
 unsigned int DataReader::ReadHex(std::string_view section, std::string_view key, unsigned int defaultValue)
 {
 	unsigned value = defaultValue;
-	if (const std::string_view* text = FindValue(section, key); text && (*text)[0] == '0' && (*text)[1] == 'x')
+	if (const std::string_view* text = FindValue(section, key); text && text->size() >= 2 && (*text)[0] == '0' && (*text)[1] == 'x')
 		fromString<unsigned int>(text->substr(2), value, 16);
 
 	return value;

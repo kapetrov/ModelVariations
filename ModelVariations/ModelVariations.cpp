@@ -33,7 +33,7 @@
 #pragma comment (lib, "urlmon.lib")
 
 
-#define MOD_VERSION "10.9"
+#define MOD_VERSION "11.0"
 //Using Plugin-SDK: 34ba198
 
 struct jumpInfo {
@@ -163,8 +163,8 @@ void download_async(std::string url, std::string path)
 void logVariationsChange(const char* msg)
 {
     auto player = FindPlayerPed();
-    auto pPos = FindPlayerCoors(-1);
-    auto wanted = FindPlayerWanted(-1);
+    CVector pPos = FindPlayerCoors(-1);
+    CWanted* wanted = FindPlayerWanted(-1);
     CZone* zInfo = NULL;
     CTheZones::GetZoneInfo(&pPos, &zInfo);
 
@@ -178,7 +178,7 @@ void logVariationsChange(const char* msg)
     Log::Write("currentWanted = %u wanted->m_nWantedLevel = %u\n", currentWanted, wanted->m_nWantedLevel);
     Log::Write("currentZone = %.8s zInfo->m_szLabel = %.8s\n", currentZone, zInfo->m_szLabel);
 
-    if (player->m_pEnex)
+    if (player && player->m_pEnex)
         Log::Write("player->m_pEnex = %.8s\n", player->m_pEnex);
 }
 
@@ -1005,12 +1005,6 @@ char __cdecl InitialiseRenderWareHooked()
 {
     char retVal = InitialiseRenderWareOriginal();
 
-    if (!plugin::IsGameVersion10us())
-    {
-        MessageBox(NULL, "Error! Unsupported EXE version detected!\nThis mod supports only the US v1.0 EXE.", "Model Variations", MB_ICONERROR);
-        return retVal;
-    }
-
     char exePath[MAX_PATH] = {};
     GetModuleFileName(NULL, exePath, MAX_PATH-1);
 
@@ -1174,6 +1168,12 @@ char __cdecl InitialiseRenderWareHooked()
 class ModelVariations {
 public:
     ModelVariations() {
+
+        if (!plugin::IsGameVersion10us())
+        {
+            MessageBox(NULL, "Error! Unsupported EXE version detected!\nThis mod supports only the US v1.0 EXE.", "Model Variations", MB_ICONERROR);
+            return;
+        }
 
         InitialiseRenderWareOriginal = injector::MakeCALL(0x5BF3A1, InitialiseRenderWareHooked, true).get();
         FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<const void*>(0x5BF3A1), 5);

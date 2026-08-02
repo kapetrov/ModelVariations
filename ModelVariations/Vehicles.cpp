@@ -1996,6 +1996,9 @@ __declspec(noinline) void __cdecl PossiblyRemoveVehicleHooked(CVehicle* car)
         {
             for (auto& trailer : trailersToCheck)
             {
+                if (!IsVehiclePointerValid(trailer))
+                    continue;
+
                 if (trailer->m_pTractor)
                     trailer->bFadeOut = true;
                 else if ((CTimer::m_snTimeInMilliseconds - trailer->m_nCreationTime) > 1500)
