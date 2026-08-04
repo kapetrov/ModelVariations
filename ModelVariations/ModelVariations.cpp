@@ -832,31 +832,40 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
             if (it.name == NULL || it.name[0] == 0)
                 continue;
 
-            const std::uintptr_t functionAddress = (it.isVTableAddress == false) ? injector::GetBranchDestination(it.address).as_int() : *reinterpret_cast<unsigned int*>(it.address);
-            std::pair<std::string, MODULEINFO> moduleInfo = LoadedModules::GetModuleAtAddress(functionAddress);
-            std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
+            const std::uintptr_t functionAddress = !it.isVTableAddress ? injector::GetBranchDestination(it.address).as_int() : *reinterpret_cast<const std::uintptr_t*>(it.address);
 
-            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.address).second)
+            const std::uintptr_t expectedFunctionAddress = reinterpret_cast<std::uintptr_t>(it.changedFunction);
+
+            if (functionAddress != expectedFunctionAddress && callChecks.insert(it.address).second)
             {
+                const auto moduleInfo = LoadedModules::GetModuleAtAddress(functionAddress);
+
+                const std::string moduleName = getFilenameFromPath(moduleInfo.first);
+
                 if (functionAddress > 0 && !moduleName.empty())
                     Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.name, it.address, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
                 else
                     Log::Write("Modified call detected: %s 0x%08X %s\n", it.name, it.address, bytesToString(it.address, 5).c_str());
             }
 
-            auto gta_saModule = LoadedModules::GetExeModule();
-            std::uintptr_t gta_saEndAddress = ((std::uintptr_t)gta_saModule.second.lpBaseOfDll + gta_saModule.second.SizeOfImage);
+            const auto& gtaSaModule = LoadedModules::GetExeModule();
+            const std::uintptr_t gtaSaBase = reinterpret_cast<std::uintptr_t>(gtaSaModule.second.lpBaseOfDll);
+            const std::uintptr_t gtaSaEnd = gtaSaBase + gtaSaModule.second.SizeOfImage;
 
-            if ((std::uintptr_t)it.originalFunction < gta_saEndAddress)
+            const std::uintptr_t originalFunction = reinterpret_cast<std::uintptr_t>(it.originalFunction);
+
+            if (gtaSaBase && originalFunction >= gtaSaBase && originalFunction < gtaSaEnd)
             {
-                auto functionStartDestination = injector::GetBranchDestination(it.originalFunction).as_int();
-                if (functionStartDestination && functionStartDestination > gta_saEndAddress)
+                const std::uintptr_t functionStartDestination = injector::GetBranchDestination(originalFunction).as_int();
+
+                if (functionStartDestination && (functionStartDestination < gtaSaBase || functionStartDestination >= gtaSaEnd))
                 {
-                    auto functionStartModule = LoadedModules::GetModuleAtAddress(functionStartDestination);
-                    std::string functionStartModuleName = functionStartModule.first.substr(functionStartModule.first.find_last_of("/\\") + 1);
+                    const auto functionStartModule = LoadedModules::GetModuleAtAddress(functionStartDestination);
+
+                    const std::string functionStartModuleName = getFilenameFromPath(functionStartModule.first);
 
                     if (!strcasecmp(functionStartModuleName, MOD_NAME))
-                        Log::LogModifiedAddress((std::uintptr_t)it.originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.name, it.originalFunction, functionStartDestination, functionStartModuleName.c_str());
+                        Log::LogModifiedAddress(originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.name, originalFunction, functionStartDestination, functionStartModuleName.c_str());
                 }
             }
         }

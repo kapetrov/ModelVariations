@@ -205,6 +205,7 @@ void* hookCallImpl(std::uintptr_t address, void* pFunction, const char* name, bo
     }
 
     storeHookDescriptor(hookedCalls, hookedCallCount, { address, name, originalAddress, pFunction, isVTableAddress });
+    Log::Write("Added call hook %s<0x%X>\n", name ? name : "UnknownHook", address);
 
     return originalAddress;
 }
