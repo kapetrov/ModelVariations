@@ -576,13 +576,15 @@ int getRandomVariation(const int modelid, bool parked = false)
     }
 
     const unsigned short variationModel = vectorGetRandom(it->second);
-    if (variationModel > 0)
+    if (variationModel > 0 != variationModel != modelid)
     {
         if (auto loadState = loadModel(variationModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
         {
             Log::Write("Error loading vehicle model %d (%s) %s\n", variationModel, modelNames.contains(variationModel) ? modelNames[variationModel].c_str() : "", getLoadStateString(loadState));
             return modelid;
         }
+
+        Log::WriteVerbose("[%s] Selected variation %u for vehicle model %u\n", getDatetime(false, true, true).c_str(), variationModel, modelid);
 
         return variationModel;
     }

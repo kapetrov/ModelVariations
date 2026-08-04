@@ -8,8 +8,9 @@
 
 HANDLE logfile = INVALID_HANDLE_VALUE;
 std::set<std::uintptr_t> modifiedAddresses;
+bool verboseStatus = false;
 
-bool Log::Open(const std::string &filename)
+bool Log::Open(const std::string &filename, bool verbose)
 {
 	if (logfile != INVALID_HANDLE_VALUE)
 	{
@@ -20,7 +21,11 @@ bool Log::Open(const std::string &filename)
 	logfile = CreateFile(filename.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL);
 
 	modifiedAddresses.clear();
-	return logfile != INVALID_HANDLE_VALUE;
+	if (logfile == INVALID_HANDLE_VALUE)
+		return false;
+
+	verboseStatus = verbose;
+	return true;
 }
 
 bool Log::Close()
@@ -33,29 +38,47 @@ bool Log::Close()
 	return retVal;
 }
 
-bool Log::Write(const char* format, ...)
+bool WriteImpl(const char* format, va_list args)
 {
 	if (logfile == INVALID_HANDLE_VALUE)
 		return false;
 
-	va_list argptr;
-	va_start(argptr, format);
-
-	auto out = mvsprintf(format, argptr);
-
-	va_end(argptr);
+	auto out = mvsprintf(format, args);
 
 	if (out.empty())
 		return false;
 
 	DWORD bytesWritten = 0;
-	if (WriteFile(logfile, out.data(), out.size(), &bytesWritten, NULL) == 0 && GetLastError() != ERROR_IO_PENDING)
+
+	if (!WriteFile(logfile, out.data(), static_cast<DWORD>(out.size()), &bytesWritten, nullptr) && GetLastError() != ERROR_IO_PENDING)
 		return false;
 
-	if (out.size() != bytesWritten)
+	return out.size() == bytesWritten;
+}
+
+bool Log::Write(const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	const bool result = WriteImpl(format, args);
+
+	va_end(args);
+	return result;
+}
+
+bool Log::WriteVerbose(const char* format, ...)
+{
+	if (!verboseStatus)
 		return false;
 
-	return true;
+	va_list args;
+	va_start(args, format);
+
+	const bool result = WriteImpl(format, args);
+
+	va_end(args);
+	return result;
 }
 
 bool Log::LogModifiedAddress(std::uintptr_t address, const char* format, ...)

@@ -81,7 +81,7 @@ int lastMissionLoaded = -1;
 int currentMission = -1;
 
 //INI Options
-bool enableLog = false;
+int enableLog = 0;
 bool logJumps = false;
 bool enablePeds = false;
 bool enableSpecialPeds = false;
@@ -1035,13 +1035,17 @@ char __cdecl InitialiseRenderWareHooked()
     disableKey = iniSettings.ReadInteger("Settings", "DisableKey", 0);
     reloadKey = iniSettings.ReadInteger("Settings", "ReloadKey", 0);
     debugKey = iniSettings.ReadInteger("Settings", "DebugKey", 0);
-    enableLog = iniSettings.ReadBoolean("Settings", "EnableLog", false) && Log::Open("ModelVariations.log");
+    enableLog = iniSettings.ReadInteger("Settings", "EnableLog", 0);
     logJumps = iniSettings.ReadBoolean("Settings", "LogJumps", false);
     debugDrawSize = iniSettings.ReadFloat("Settings", "DebugDrawSize", 0.28f);
     debugDrawX = iniSettings.ReadFloat("Settings", "DebugDrawX", 20.0f);
     debugDrawY = iniSettings.ReadFloat("Settings", "DebugDrawY", 340.0f);
     debugDrawPeds = iniSettings.ReadHex("Settings", "DebugDrawPeds", 0);
     debugDrawVehicles = iniSettings.ReadHex("Settings", "DebugDrawVehicles", 0);
+
+    if (enableLog > 0)
+        if (!Log::Open("ModelVariations.log", enableLog == 2))
+            enableLog = 0;
 
     std::string checkForceEnabled = iniSettings.ReadString("Settings", "ForceEnable", "");
     if (!checkForceEnabled.empty())

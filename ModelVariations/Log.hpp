@@ -6,9 +6,10 @@
 class Log
 {
 public:
-	static bool Open(const std::string &filename);
+	static bool Open(const std::string &filename, bool verbose = false);
 	static bool Close();
 	static bool Write(const char* format, ...);
+	static bool WriteVerbose(const char* format, ...);
 
 	static bool LogModifiedAddress(std::uintptr_t address, const char* format, ...);
 };

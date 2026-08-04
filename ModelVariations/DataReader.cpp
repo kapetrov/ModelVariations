@@ -320,6 +320,8 @@ std::vector<unsigned short> DataReader::ReadLine(std::string_view section, std::
 								pedInfo->m_nPedType = ePedType::PED_TYPE_CIVMALE;
 								pedInfo->m_nRadio1 = mInfo7->m_nRadio1;
 								pedInfo->m_nRadio2 = mInfo7->m_nRadio2;
+
+								Log::WriteVerbose("[%s] Added new ped \"%s\" in id % u\n", getDatetime(false, true, true).c_str(), token, i);
 							}
 							break;
 						}

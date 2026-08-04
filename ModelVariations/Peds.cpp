@@ -796,6 +796,8 @@ __declspec(noinline) void __fastcall SetModelIndexHooked(CEntity* _this, void*, 
                     
             originalCall.callMethod(_this, newModel);
 
+            Log::WriteVerbose("[%s] Ped 0x%08X index %d was replaced with model %u\n", getDatetime(false, true, true).c_str(), reinterpret_cast<uint32_t>(_this), index, newModel);
+
             if (!vectorHasId(pedVars.dontInheritBehaviourModels, index))
                 _this->m_nModelIndex = (unsigned short)index;
             variationModel = newModel;
