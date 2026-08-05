@@ -120,7 +120,7 @@ struct tVehVars {
     std::array<unsigned short, 65536> originalModels{};
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
     std::unordered_map<unsigned short, std::array<std::vector<unsigned short>, 6>> wantedVariations;
-    std::unordered_map<unsigned short, std::unordered_map<unsigned short, std::vector<unsigned short>>> missionVariations;
+    std::unordered_map<unsigned short, std::unordered_map<std::string, std::vector<unsigned short>>> missionVariations;
 
     std::map<unsigned short, std::vector<unsigned short>> currentVariations;
 
@@ -763,12 +763,12 @@ void VehicleVariations::LoadData()
                         }
                     }
                 }
-                else if (kvp.first.starts_with("MISSION"))
+                else if (kvp.first.size() >= 8 && kvp.first.starts_with("MISSION"))
                 {
-                    int missionId = -1;
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_VEHICLES);
-                    if (fromString<int>(kvp.first.substr(7), missionId) && !vec.empty() && missionId < 65536)
-                        vehVars.missionVariations[modelid][static_cast<unsigned short>(missionId)] = vec;
+
+                    if (!vec.empty())
+                        vehVars.missionVariations[modelid].insert({ (kvp.first[7] == '_') ? std::string(kvp.first.substr(8)) : std::string(kvp.first), vec });
                 }
             }
 
@@ -1277,37 +1277,41 @@ void VehicleVariations::UpdateVariations()
     if (currentZoneTuning != vehVars.tuning.end())
         vehVars.currentTuning = &(currentZoneTuning->second);
 
-    if (currentZoneVariations != vehVars.variations.end())
-        for (auto& modelid : vehVars.vehHasVariations)
+    if (currentZoneVariations == vehVars.variations.end())
+        return;
+
+    for (auto& modelid : vehVars.vehHasVariations)
+    {
+        if (auto it = currentZoneVariations->second.find(modelid); it != currentZoneVariations->second.end())
+            vehVars.currentVariations[modelid] = it->second;
+
+        if (wanted)
         {
-            if (auto it = currentZoneVariations->second.find(modelid); it != currentZoneVariations->second.end())
-                vehVars.currentVariations[modelid] = it->second;
-
-            if (wanted)
+            const unsigned int wantedLevel = wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0);
+            if (auto it = vehVars.wantedVariations.find(modelid); it != vehVars.wantedVariations.end())
             {
-                const unsigned int wantedLevel = wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0);
-                if (auto it = vehVars.wantedVariations.find(modelid); it != vehVars.wantedVariations.end())
-                {
-                    if (!it->second[wantedLevel].empty() && !vehVars.currentVariations[modelid].empty())
-                        vectorfilterVector(vehVars.currentVariations[modelid], it->second[wantedLevel]);
-                }
-            }
-
-            if (vehVars.activeTimeGroups.contains(modelid))
-                for (auto i : vehVars.activeTimeGroups[modelid])
-                    vectorfilterVector(vehVars.currentVariations[modelid], vehVars.timeGroups[modelid][i].variations);
-
-            if (auto it = vehVars.missionVariations.find(modelid); it != vehVars.missionVariations.end())
-            {
-                if (!CTheScripts__IsPlayerOnAMission())
-                {
-                    if (auto it2 = it->second.find(0); it2 != it->second.end())
-                        vectorfilterVector(vehVars.currentVariations[modelid], it2->second);
-                }
-                else if (auto it2 = it->second.find(static_cast<unsigned short>(lastMissionLoaded)); it2 != it->second.end())
-                    vectorfilterVector(vehVars.currentVariations[modelid], it2->second);
+                if (!it->second[wantedLevel].empty() && !vehVars.currentVariations[modelid].empty())
+                    vectorfilterVector(vehVars.currentVariations[modelid], it->second[wantedLevel]);
             }
         }
+
+        if (vehVars.activeTimeGroups.contains(modelid))
+            for (auto i : vehVars.activeTimeGroups[modelid])
+                vectorfilterVector(vehVars.currentVariations[modelid], vehVars.timeGroups[modelid][i].variations);
+
+        if (auto it = vehVars.missionVariations.find(modelid); it != vehVars.missionVariations.end())
+        {
+            if (!CTheScripts__IsPlayerOnAMission())
+            {
+                if (auto it2 = it->second.find("MISSIONGAMEPLAY"); it2 != it->second.end())
+                    vectorfilterVector(vehVars.currentVariations[modelid], it2->second);
+            }
+            else if (auto it2 = it->second.find(currentMission); it2 != it->second.end())
+                vectorfilterVector(vehVars.currentVariations[modelid], it2->second);
+            else if (auto it3 = it->second.find("MISSIONALL"); it3 != it->second.end())
+                vectorfilterVector(vehVars.currentVariations[modelid], it3->second);
+        }
+    }
 }
 
 void VehicleVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)

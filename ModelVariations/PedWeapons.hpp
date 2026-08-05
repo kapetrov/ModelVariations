@@ -4,7 +4,7 @@
 
 extern char currentZone[9];
 extern std::chrono::milliseconds gameplayTimeSinceLoad;
-extern int lastMissionLoaded;
+extern char currentMission[9];
 
 class PedWeaponVariations
 {

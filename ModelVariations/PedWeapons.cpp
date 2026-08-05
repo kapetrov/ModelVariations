@@ -237,7 +237,7 @@ void PedWeaponVariations::Process()
         if (player->m_pEnex)
             copyString(zoneString, reinterpret_cast<char*>(player->m_pEnex), 8);
 
-        const std::string missionString = (isOnMission) ? ("MISSION" + std::to_string(lastMissionLoaded) + "|") : "";
+        const std::string missionString = (isOnMission) ? ("MISSION_" + std::string(currentMission) + "|") : "";
         const std::string wantedString = (wantedLevel > 0) ? ("WANTED" + std::to_string(wantedLevel) + "|") : "";
         std::string vehString = "ON_FOOT|";
         if (pedInVehicle)

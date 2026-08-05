@@ -11,7 +11,7 @@ extern std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 extern bool forceEnableGlobal;
 extern char currentZone[9];
 extern bool enableNullGuards;
-extern int lastMissionLoaded;
+extern char currentMission[9];
 
 enum class debugDrawVehStats
 {

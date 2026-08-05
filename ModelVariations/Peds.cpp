@@ -30,7 +30,7 @@ std::vector<int16_t> destroyedModelCounters;
 struct tPedVars {
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
     std::unordered_map<unsigned short, std::array<std::vector<unsigned short>, 6>> wantedVariations;
-    std::unordered_map<unsigned short, std::unordered_map<unsigned short, std::vector<unsigned short>>> missionVariations;
+    std::unordered_map<unsigned short, std::unordered_map<std::string, std::vector<unsigned short>>> missionVariations;
     std::map<unsigned short, std::vector<unsigned short>> currentVariations;
     std::unordered_map<unsigned short, std::vector<pedTimeGroup>> timeGroups;
     std::unordered_map<unsigned short, std::set<unsigned short>> activeTimeGroups;
@@ -221,12 +221,12 @@ void PedVariations::LoadData()
                         }
                     }
                 }
-                else if (kvp.first.starts_with("MISSION"))
+                else if (kvp.first.size() >= 8 && kvp.first.starts_with("MISSION"))
                 {
-                    int missionId = -1;
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_PEDS);
-                    if (fromString<int>(kvp.first.substr(7), missionId) && !vec.empty() && missionId < 65536)
-                        pedVars.missionVariations[modelIndex][static_cast<unsigned short>(missionId)] = vec;
+
+                    if (!vec.empty())
+                        pedVars.missionVariations[modelIndex].insert({ (kvp.first[7] == '_') ? std::string(kvp.first.substr(8)) : std::string(kvp.first), vec });
                 }
             }
 
@@ -550,11 +550,13 @@ void PedVariations::UpdateVariations()
         {
             if (!CTheScripts__IsPlayerOnAMission())
             {
-                if (auto it2 = it->second.find(0); it2 != it->second.end())
+                if (auto it2 = it->second.find("MISSIONGAMEPLAY"); it2 != it->second.end())
                     vectorfilterVector(pedVars.currentVariations[modelid], it2->second);
             }
-            else if (auto it2 = it->second.find(static_cast<unsigned short>(lastMissionLoaded)); it2 != it->second.end())
+            else if (auto it2 = it->second.find(currentMission); it2 != it->second.end())
                 vectorfilterVector(pedVars.currentVariations[modelid], it2->second);
+            else if (auto it3 = it->second.find("MISSIONALL"); it3 != it->second.end())
+                vectorfilterVector(pedVars.currentVariations[modelid], it3->second);
         }
     }
 }

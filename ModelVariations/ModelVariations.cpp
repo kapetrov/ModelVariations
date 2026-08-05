@@ -77,8 +77,8 @@ bool newVersionFound = false;
 
 int flaMaxID = -1;
 
-int lastMissionLoaded = -1;
-int currentMission = -1;
+char lastMissionLoaded[9] = {};
+char currentMission[9] = {};
 
 //INI Options
 int enableLog = 0;
@@ -174,7 +174,7 @@ void logVariationsChange(const char* msg)
     Log::Write("\n%s (%s)\n", msg, getDatetime(false, true, true).c_str());
     Log::Write("Streaming Memory usage: %u/%u MB  Total Memory usage: %u MB\n", CStreaming__ms_memoryUsed/1024/1024, CStreaming__ms_memoryAvailable/1024/1024, getMemoryUsage()/1024/1024);
     Log::Write("Updating variations. pPos = {%f, %f, %f}\n", pPos.x, pPos.y, pPos.z);
-    Log::Write("currentMission = %d lastMissionLoaded = %d\n", currentMission, lastMissionLoaded);
+    Log::Write("currentMission = %s lastMissionLoaded = %s\n", currentMission, lastMissionLoaded);
     Log::Write("currentWanted = %u wanted->m_nWantedLevel = %u\n", currentWanted, wanted->m_nWantedLevel);
     Log::Write("currentZone = %.8s zInfo->m_szLabel = %.8s\n", currentZone, zInfo->m_szLabel);
 
@@ -566,9 +566,7 @@ __declspec(noinline) void CPopCycle__DisplayHooked()
         PrintDebugLine("Debug state: %d", drawDebugText);
         PrintDebugLine("%d MB %d MB", CStreaming__ms_memoryUsed / 1024 / 1024, getMemoryUsage() / 1024 / 1024);
         if (CTheScripts__IsPlayerOnAMission())
-            for (CRunningScript* script = CTheScripts__pActiveScripts; script; script = script->m_pNext)
-                if (script->m_bIsActive && script->m_bIsMission)
-                    PrintDebugLine("Mission: %s", script->m_szName);
+            PrintDebugLine("Mission: %s", lastMissionLoaded);
 
         PrintDebugLine("Current zone: %s", currentZone);
         if (player && player->m_pEnex)
@@ -584,13 +582,6 @@ __declspec(noinline) void CPopCycle__DisplayHooked()
     }
 
     originalCall.call();
-}
-
-__declspec(noinline) void __cdecl CTimer__SuspendHooked()
-{
-    const auto originalCall = captureCurrentOriginalCall();
-    originalCall.call();
-    lastMissionLoaded = ScriptParams[0];
 }
 
 //Model names
@@ -893,7 +884,13 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
     const CWanted* wanted = FindPlayerWanted(-1);
 
     if (!CTheScripts__IsPlayerOnAMission())
-        lastMissionLoaded = -1;
+        lastMissionLoaded[0] = 0;
+    else
+    {
+        for (CRunningScript* script = CTheScripts__pActiveScripts; script; script = script->m_pNext)
+            if (script->m_bIsActive && script->m_bIsMission)
+                strncpy(lastMissionLoaded, script->m_szName, 8);
+    }
 
     if (!CEntryExitManager__mp_Active)
         transitioning = false;
@@ -914,12 +911,14 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
         updateVariations();
     }
 
-    if (currentMission != lastMissionLoaded)
+    if (!strcasecmp(currentMission, lastMissionLoaded))
     {
         logVariationsChange("Mission changed");
 
-        //lastOnMission = onMission;
-        currentMission = lastMissionLoaded;
+        strcpy(currentMission, lastMissionLoaded);
+        for (auto& c : currentMission)
+            c = toUpper(c);
+
         updateVariations();
     }
 
@@ -1147,7 +1146,6 @@ char __cdecl InitialiseRenderWareHooked()
     hookSharedCall<0x40E37B, RetryLoadFileHooked>("CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
     hookSharedCall<0x440F89, TransitionFinishedHooked>("CEntryExit::TransitionFinished"); //CEntryExitManager::Update
     hookSharedCall<0x53E293, CPopCycle__DisplayHooked>("CPopCycle::Display"); //Render2dStuff
-    hookSharedCall<0x489955, CTimer__SuspendHooked>("CTimer::Suspend"); //0417: LOAD_AND_LAUNCH_MISSION_INTERNAL
 
     //CFileLoader::LoadObjectTypes
     hookSharedCall<0x5B85DD, FileLoaderLoadObject>("CFileLoader::LoadObject");
