@@ -294,12 +294,18 @@ std::vector<unsigned short> DataReader::ReadLine(std::string_view section, std::
 			{
 				CPedModelInfo* mInfo7 = reinterpret_cast<CPedModelInfo*>(CModelInfo::GetModelInfo(7));
 
-				if (CStreaming__ms_pExtraObjectsDir->m_nNumEntries >= CStreaming__ms_pExtraObjectsDir->m_nCapacity)
+				auto extraObjectsDir = CStreaming__ms_pExtraObjectsDir;
+
+				Log::WriteVerbose("[%s] ExtraObjectsDir->m_nNumEntries = %d pExtraObjectsDir->m_nCapacity = %d\n", getDatetime(false, true, true).c_str(), 
+																												   extraObjectsDir->m_nNumEntries,
+																												   extraObjectsDir->m_nCapacity);
+
+				if (extraObjectsDir->m_nNumEntries >= extraObjectsDir->m_nCapacity)
 				{
 					reachedMaxCapacity = true;
-					Log::Write("WARNING: The number of extra object directory entries has reached max capacity (%u)\n", CStreaming__ms_pExtraObjectsDir->m_nCapacity);
+					Log::Write("WARNING: The number of extra object directory entries has reached max capacity (%u)\n", extraObjectsDir->m_nCapacity);
 				}
-				else if (CStreaming__ms_pExtraObjectsDir->FindItem(token) && isAddressValid(mInfo7))
+				else if (extraObjectsDir->FindItem(token) && isAddressValid(mInfo7))
 				{
 					static unsigned short startID = 1326;
 					for (unsigned short i = startID; i < std::min(maxPedID, 65535); i++)
