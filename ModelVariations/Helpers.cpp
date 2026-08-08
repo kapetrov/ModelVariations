@@ -46,23 +46,27 @@ std::string getFullPath(const std::string& filename)
     return filename.find(':') != std::string::npos ? filename : (LoadedModules::GetSelfDirectory() + '\\' + filename);
 }
 
-std::string printFilenameWithBorder(const std::string& name, const char ch)
+[[nodiscard]]
+std::string printFilenameWithBorder(std::string_view name, char ch)
 {
-    std::string outString;
-    size_t line_width = name.size() + 6; // "## " + name + " ##"
+    const std::size_t lineWidth = name.size() + 6;
 
+    std::string out;
+    out.reserve(3 * lineWidth + 2);
 
-    for (size_t i = 0; i < line_width; i++)
-        outString += ch;
+    out.append(lineWidth, ch);
+    out.push_back('\n');
 
-    outString += "\n";
-    outString += std::string(2, ch) + " " + name + " " + std::string(2, ch);
-    outString += "\n";
+    out.append(2, ch);
+    out.push_back(' ');
+    out.append(name);
+    out.push_back(' ');
+    out.append(2, ch);
+    out.push_back('\n');
 
-    for (size_t i = 0; i < line_width; i++)
-        outString += ch;
+    out.append(lineWidth, ch);
 
-    return outString;
+    return out;
 }
 
 bool fileExists(const std::string& filename)

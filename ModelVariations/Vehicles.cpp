@@ -576,7 +576,7 @@ int getRandomVariation(const int modelid, bool parked = false)
     }
 
     const unsigned short variationModel = vectorGetRandom(it->second);
-    if (variationModel > 0 != variationModel != modelid)
+    if (variationModel > 0 && variationModel != modelid)
     {
         if (auto loadState = loadModel(variationModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
         {

@@ -13,7 +13,7 @@ bool isGameHOODLUM();
 bool isGameCompact();
 CVector2D convert3DVectorTo2D(const CVector& vec);
 std::string getFullPath(const std::string& filename);
-std::string printFilenameWithBorder(const std::string& name, const char ch = '#');
+std::string printFilenameWithBorder(std::string_view name, char ch = '#');
 bool fileExists(const std::string& filename);
 bool isTimeInRange(int timeNow, int timeStart, int timeEnd);
 std::string getDatetime(bool printDate, bool printTime, bool printMs);
