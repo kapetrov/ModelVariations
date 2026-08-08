@@ -69,6 +69,16 @@ namespace {
 
 SharedCallHookState* currentSharedCallHook = nullptr;
 
+void logMissingOriginalFunction(std::uintptr_t address)
+{
+    Log::Write("Error! Original function not found for address 0x%08X\n", address);
+}
+
+void logMissingOriginalMethod(std::uintptr_t address)
+{
+    Log::Write("Error! Original method not found for address 0x%08X\n", address);
+}
+
 std::span<const hookinfo> getHookedCalls() noexcept
 {
     return { hookedCalls.data(), hookedCallCount };
@@ -79,14 +89,14 @@ std::span<const asmhookinfo> getASMHooks() noexcept
     return { hooksASM.data(), asmHookCount };
 }
 
-void logMissingOriginalFunction(std::uintptr_t address)
+std::size_t getSharedCallStateCount()
 {
-    Log::Write("Error! Original function not found for address 0x%08X\n", address);
+    return sharedCallStateCount;
 }
 
-void logMissingOriginalMethod(std::uintptr_t address)
+std::size_t getNumMaxHooks()
 {
-    Log::Write("Error! Original method not found for address 0x%08X\n", address);
+    return MaxHookDescriptors;
 }
 
 __declspec(noinline) void* __fastcall createSharedCallThunkImpl(SharedCallHookState* state, void* target) noexcept

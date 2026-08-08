@@ -33,6 +33,9 @@ void logMissingOriginalMethod(std::uintptr_t address);
 std::span<const hookinfo> getHookedCalls() noexcept;
 std::span<const asmhookinfo> getASMHooks() noexcept;
 
+std::size_t getSharedCallStateCount();
+std::size_t getNumMaxHooks();
+
 template <std::uintptr_t address>
 struct OriginalHookSlot {
     static inline void* function = nullptr;

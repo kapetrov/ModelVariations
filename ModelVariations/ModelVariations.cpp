@@ -563,7 +563,9 @@ __declspec(noinline) void CPopCycle__DisplayHooked()
         bool isFoggy = CWeather::Foggyness > 0.3;
         bool isWindy = CWeather::Wind > 0.29;
 
+        PrintDebugLine("Model Variations v" MOD_VERSION);
         PrintDebugLine("Debug state: %d", drawDebugText);
+        PrintDebugLine("Call hooks: %u/%u/%u", getSharedCallStateCount(), getHookedCalls().size(), getNumMaxHooks());
         PrintDebugLine("%d MB %d MB", CStreaming__ms_memoryUsed / 1024 / 1024, getMemoryUsage() / 1024 / 1024);
         if (CTheScripts__IsPlayerOnAMission())
             PrintDebugLine("Mission: %s", lastMissionLoaded);
