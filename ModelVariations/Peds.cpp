@@ -67,6 +67,8 @@ static tPedOptions pedOptions;
 
 unsigned short variationModel = 0;
 
+bool ignoreCivilianVariety = false;
+
 std::map<CPed*, unsigned short> changedVoices;
 
 struct
@@ -904,9 +906,25 @@ __declspec(noinline) void* __fastcall CreateNextSubTaskHooked(CTaskComplexCopInC
     return originalCall.callMethodAndReturn<void*>(_this, ped);
 }
 
+__declspec(noinline) int __cdecl ChooseCivilianOccupationHooked(char male, char female, int animType, int ignoreModelIndex, int statType,
+    char a6, char a7, char checkAttractor, char* attrName)
+{
+    const auto originalCall = captureCurrentOriginalCall();
+
+    ignoreCivilianVariety = true;
+
+    return originalCall.callAndReturn<int>(male, female, animType, ignoreModelIndex, statType, a6, a7, checkAttractor, attrName);
+}
+
 __declspec(noinline) bool __cdecl PedIsAcceptableInCurrentZoneHooked(int a1)
 {
     const auto originalCall = captureCurrentOriginalCall();
+
+    if (ignoreCivilianVariety)
+    {
+        ignoreCivilianVariety = false;
+        return originalCall.callAndReturn<bool>(a1);
+    }
 
     for (CPed *ped : CPools::ms_pPedPool)
     {
@@ -1046,8 +1064,9 @@ void PedVariations::InstallHooks(bool enableSpecialPeds)
 
     if (pedOptions.improveCivilianVariety)
     {
+        hookSharedCall<0x48335E, ChooseCivilianOccupationHooked>("CPopulation::ChooseCivilianOccupation"); //0376 CREATE_RANDOM_CHAR
         hookSharedCall<0x61302B, PedIsAcceptableInCurrentZoneHooked>("CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
-        hookSharedCall<0x61330D, PedIsAcceptableInCurrentZoneHooked>("CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupation
+        hookSharedCall<0x61330D, PedIsAcceptableInCurrentZoneHooked>("CPopCycle::PedIsAcceptableInCurrentZone"); //CPopulation::ChooseCivilianOccupationForVehicle
         hookSharedCall<0x613B32, ChooseCivilianOccupationForVehicleHooked>("CPopulation::ChooseCivilianOccupationForVehicle"); //CPopulation::AddPedInCar
     }
 }
