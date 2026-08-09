@@ -119,15 +119,20 @@ inline const char* getLoadStateString(unsigned char loadState)
 
 inline unsigned char loadModel(int model, int streamingFlags, bool loadImmediately)
 {
-    if (model < 1)
+    if (model < 1 || model > 65535)
         return false;
+
+    auto arrayBase = CStreamingInfo__ms_pArrayBase;
+
+    if (arrayBase[static_cast<unsigned short>(model)].m_nLoadState == LOADSTATE_LOADED)
+        return LOADSTATE_LOADED;
 
     CStreaming__RequestModel(model, streamingFlags);
 
     if (loadImmediately)
         CStreaming__LoadAllRequestedModels(false);
 
-    return CStreamingInfo__ms_pArrayBase[static_cast<unsigned short>(model)].m_nLoadState;
+    return arrayBase[static_cast<unsigned short>(model)].m_nLoadState;
 }
 
 inline void destroyPed(CPed* ped)

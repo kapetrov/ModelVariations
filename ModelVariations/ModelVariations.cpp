@@ -367,9 +367,8 @@ void initialize()
         Log::Write("Vehicle hooks installed.\n");
     }
 
-    Log::Write("\nLoaded modules:\n");
-
-    LoadedModules::Log();
+    if (Log::Write("\nLoaded modules:\n"))
+        LoadedModules::Log();
 
     Log::Write("\n");
 
