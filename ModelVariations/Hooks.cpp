@@ -172,17 +172,12 @@ bool hookASM(std::uintptr_t address, std::size_t numberOfBytes, injector::memory
     std::string bytes = bytesToString(address, numberOfBytes);
     auto branchDestination = injector::GetBranchDestination(address).as_int();
     std::string moduleName = LoadedModules::GetModuleAtAddress(branchDestination).first;
+    const char* funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
 
     if (funcName && branchDestination)
-    {
-        const char* funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
         Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s %s 0x%08X\n", funcType, funcName, address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
-    }
     else if (funcName)
-    {
-        const char* funcType = (strstr(funcName, "::") != nullptr) ? "Modified method" : "Modified function";
         Log::LogModifiedAddress(address, "%s detected: %s - 0x%08X is %s\n", funcType, funcName, address, bytes.c_str());
-    }
     else if (branchDestination)
         Log::LogModifiedAddress(address, "Modified ASM hook detected: 0x%08X is %s %s 0x%08X\n", address, bytes.c_str(), getFilenameFromPath(moduleName).c_str(), branchDestination);
     else

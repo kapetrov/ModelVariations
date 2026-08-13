@@ -196,6 +196,7 @@ void PedWeaponVariations::Process()
                     if (pedWeaponOptions.weaponforceClearsWeapons && isWeaponforce)
                         ped->ClearWeapons();
                         
+                    Log::WriteVerbose("Giving ped 0x%08X with model id %u weapon %u\n", ped, ped->m_nModelIndex, weaponId);
                     ped->GiveWeapon(weaponId, 9999, true);
 
                     if (isWeaponforce)

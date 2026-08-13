@@ -800,7 +800,7 @@ __declspec(noinline) void __fastcall SetModelIndexHooked(CEntity* _this, void*, 
                     
             originalCall.callMethod(_this, newModel);
 
-            Log::WriteVerbose("[%s] Ped 0x%08X index %d was replaced with model %u\n", getDatetime(false, true, true).c_str(), reinterpret_cast<uint32_t>(_this), index, newModel);
+            Log::WriteVerbose("Ped 0x%08X index %d was replaced with model %u\n", reinterpret_cast<uint32_t>(_this), index, newModel);
 
             if (!vectorHasId(pedVars.dontInheritBehaviourModels, index))
                 _this->m_nModelIndex = (unsigned short)index;
@@ -1051,8 +1051,8 @@ void PedVariations::InstallHooks(bool enableSpecialPeds)
     }
 
 
-    hookSharedCall<0x5E4890, SetModelIndexHooked>("CEntity::SetModelIndex");
-    hookSharedCall<0x5E49EF, UpdateRpHAnimHooked>("CEntity::UpdateRpHAnim");
+    hookSharedCall<0x5E4890, SetModelIndexHooked>("CEntity::SetModelIndex"); //CPed::SetModelIndex
+    hookSharedCall<0x5E49EF, UpdateRpHAnimHooked>("CEntity::UpdateRpHAnim"); //CPed::SetModelIndex
 
     hookSharedCall<0x5DDBB8, CAEPedSpeechAudioEntity__InitialiseHooked>("CAEPedSpeechAudioEntity::Initialise"); //CCivilianPed
     hookSharedCall<0x5DDD24, CAEPedSpeechAudioEntity__InitialiseHooked>("CAEPedSpeechAudioEntity::Initialise"); //CCopPed

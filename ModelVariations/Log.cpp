@@ -72,6 +72,11 @@ bool Log::WriteVerbose(const char* format, ...)
 	if (!verboseStatus)
 		return false;
 
+	SYSTEMTIME systime;
+	GetSystemTime(&systime);
+
+	Write(msprintf("[%02d:%02d:%02d.%03d] ", systime.wHour, systime.wMinute, systime.wSecond, systime.wMilliseconds).c_str());
+
 	va_list args;
 	va_start(args, format);
 

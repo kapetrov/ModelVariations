@@ -101,6 +101,7 @@ inline short CVehicleModelInfo__CLinkedUpgradeList__FindOtherUpgrade(uint32_t* _
 
 #define ScriptParams (reinterpret_cast<int*>(0xA43C78))
 
+#define sscanf_SA reinterpret_cast<int(__cdecl*)(const char*, const char*, ...)>(0x8220AD)
 #define vsnprintf_SA reinterpret_cast<int(__cdecl*)(char*, size_t, const char*, va_list)>(0x825BD3)
 
 inline const char* getLoadStateString(unsigned char loadState)

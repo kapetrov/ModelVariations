@@ -253,10 +253,10 @@ std::vector<unsigned short> DataReader::ReadLine(std::string_view section, std::
 				}
 			}
 		}
-		else if (parseType == READ_TRAILERS && strncmp(token, "Trailers", 8) == 0)
+		else if (parseType == READ_TRAILERS)
 		{
-			int trailer = 0; ;
-			if (fromString<int>(token + 8, trailer) && trailer > 0)
+			int trailer = 0;
+			if (strncmp(token, "Trailers", 8) == 0 && fromString<int>(token + 8, trailer) && trailer > 0)
 				for (int i = 0; i < multiplier; i++)
 					retVector.push_back((unsigned short)trailer);
 		}
@@ -296,9 +296,7 @@ std::vector<unsigned short> DataReader::ReadLine(std::string_view section, std::
 
 				auto extraObjectsDir = CStreaming__ms_pExtraObjectsDir;
 
-				Log::WriteVerbose("[%s] ExtraObjectsDir->m_nNumEntries = %d pExtraObjectsDir->m_nCapacity = %d\n", getDatetime(false, true, true).c_str(), 
-																												   extraObjectsDir->m_nNumEntries,
-																												   extraObjectsDir->m_nCapacity);
+				Log::WriteVerbose("ExtraObjectsDir->m_nNumEntries = %d pExtraObjectsDir->m_nCapacity = %d\n", extraObjectsDir->m_nNumEntries, extraObjectsDir->m_nCapacity);
 
 				if (extraObjectsDir->m_nNumEntries >= extraObjectsDir->m_nCapacity)
 				{
@@ -327,7 +325,7 @@ std::vector<unsigned short> DataReader::ReadLine(std::string_view section, std::
 								pedInfo->m_nRadio1 = mInfo7->m_nRadio1;
 								pedInfo->m_nRadio2 = mInfo7->m_nRadio2;
 
-								Log::WriteVerbose("[%s] Added new ped \"%s\" in id % u\n", getDatetime(false, true, true).c_str(), token, i);
+								Log::WriteVerbose("Added new ped \"%s\" in id % u\n", token, i);
 							}
 							break;
 						}

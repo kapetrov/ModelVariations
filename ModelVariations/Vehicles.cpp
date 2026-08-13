@@ -584,7 +584,7 @@ int getRandomVariation(const int modelid, bool parked = false)
             return modelid;
         }
 
-        Log::WriteVerbose("[%s] Selected variation %u for vehicle model %u\n", getDatetime(false, true, true).c_str(), variationModel, modelid);
+        Log::WriteVerbose("Selected variation %u for vehicle model %u\n", variationModel, modelid);
 
         return variationModel;
     }
