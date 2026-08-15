@@ -21,6 +21,8 @@
 
 #include <array>
 #include <map>
+#include <memory>
+#include <optional>
 #include <set>
 
 using namespace plugin;
@@ -116,48 +118,71 @@ std::map<CVehicle*, std::vector<CVehicle*>> spawnedTrailers;  //<veh, <trailers>
 std::uintptr_t x6ABCBE_Destination = 0;
 std::uintptr_t x4306A1_Destination = 0;
 
-struct tVehVars {
-    std::array<unsigned short, 65536> originalModels{};
-    std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
-    std::unordered_map<unsigned short, std::array<std::vector<unsigned short>, 6>> wantedVariations;
-    std::unordered_map<unsigned short, std::unordered_map<std::string, std::vector<unsigned short>>> missionVariations;
+struct vehVariationProperties {
+    std::array<std::vector<unsigned short>, 6> wantedVariations;
+    std::unordered_map<std::string, std::vector<unsigned short>> missionVariations;
+    std::array<std::vector<unsigned short>, 6> groupWantedVariations;
+    std::vector<unsigned short> currentVariations;
+    bool hasVariations = false;
+    bool changeOnlyWhenParked = false;
+    bool useOnlyGroups = false;
+    bool hasGroupWantedVariations = false;
+    std::vector<unsigned short> drivers;
+    std::vector<unsigned short> passengers;
+    std::vector<unsigned short> driverGroups[9];
+    std::vector<unsigned short> passengerGroups[9];
+    std::vector<std::vector<unsigned short>> trailers[9];
+    std::vector<vehTimeGroup> timeGroups;
+    std::set<unsigned short> activeTimeGroups;
+    std::optional<std::pair<CVector, float>> lightPositions;
+    std::optional<RwRGBA> lightColors;
+    std::optional<RwRGBA> lightColors2;
+    std::optional<float> lightSizes;
+    std::vector<unsigned short> tuningDriverIds;
+    std::string vehName;
+    std::optional<BYTE> tuningChances;
+    std::optional<BYTE> trailersSpawnChances;
+    std::optional<short> trailersHealth;
+    std::vector<unsigned short> trailersMatchExtras;
+    std::vector<unsigned short> trailersMatchColors;
+};
 
-    std::map<unsigned short, std::vector<unsigned short>> currentVariations;
+struct tVehVars {
+
+    std::array<std::unique_ptr<vehVariationProperties>, 65536> vehById{};
+    std::vector<unsigned short> populatedModels;
+
+    std::array<unsigned short, 65536> originalModels{};
+
+    std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
 
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> occupantGroups;
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> trailerZones;
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> tuning;
-    std::unordered_map<unsigned short, std::array<std::vector<unsigned short>, 6>> groupWantedVariations;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> drivers;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> passengers;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> driverGroups[9];
-    std::unordered_map<unsigned short, std::vector<unsigned short>> passengerGroups[9];
-    std::unordered_map<unsigned short, std::vector<std::vector<unsigned short>>> trailers[9];
-    std::unordered_map<unsigned short, std::vector<vehTimeGroup>> timeGroups;
-    std::unordered_map<unsigned short, std::set<unsigned short>> activeTimeGroups;
-    std::unordered_map<unsigned short, std::pair<CVector, float>> lightPositions;
-    std::unordered_map<unsigned short, RwRGBA> lightColors;
-    std::unordered_map<unsigned short, RwRGBA> lightColors2;
-    std::unordered_map<unsigned short, float> lightSizes;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> *currentTuning = nullptr;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> tuningDriverIds;
-    std::unordered_map<unsigned short, std::string> vehModels;
-    std::unordered_map<unsigned short, BYTE> tuningChances;
-    std::unordered_map<unsigned short, BYTE> trailersSpawnChances;
-    std::unordered_map<unsigned short, short> trailersHealth;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> trailersMatchExtras;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> trailersMatchColors;
-
-    std::vector<unsigned short> parkedCars;
-    std::vector<unsigned short> useOnlyGroups;
-
-    std::set<unsigned short> vehHasVariations;
+    std::unordered_map<unsigned short, std::vector<unsigned short>>* currentTuning = nullptr;
 
     std::vector<std::pair<CVehicle*, std::array<int, 18>>> tuningStack;
     std::vector<CVehicle*> stack;
 };
 
 static tVehVars vehVars;
+
+static vehVariationProperties* findVehProperties(unsigned short modelId) noexcept
+{
+    return vehVars.vehById[modelId].get();
+}
+
+static vehVariationProperties& getOrCreateVehProperties(unsigned short modelId)
+{
+    auto& properties = vehVars.vehById[modelId];
+    if (!properties)
+    {
+        properties = std::make_unique<vehVariationProperties>();
+        vehVars.populatedModels.push_back(modelId);
+    }
+
+    return *properties;
+}
 
 
 struct tVehOptions {
@@ -478,20 +503,18 @@ void processTuning(CVehicle* veh)
                     partsToInstall[modSlot].push_back(part);
             }
 
-        auto tuningChance = vehVars.tuningChances.find(veh->m_nModelIndex);
+        const auto* properties = findVehProperties(veh->m_nModelIndex);
 
         std::array<bool, 18> slotsSelected = {};
         for (unsigned int i = 0; i < 18; i++)
-            if (tuningChance != vehVars.tuningChances.end())
-                slotsSelected[i] = (tuningChance->second > 0) && (rand<uint32_t>(0, 100) < tuningChance->second);
+            if (properties && properties->tuningChances)
+                slotsSelected[i] = (*properties->tuningChances > 0) && (rand<uint32_t>(0, 100) < *properties->tuningChances);
             else
                 slotsSelected[i] = rand<uint32_t>(0, 3) == 0;
 
-        std::string section;
-        if (auto it2 = vehVars.vehModels.find(veh->m_nModelIndex); it2 != vehVars.vehModels.end())
-            section = it2->second;
-        else
-            section = std::to_string(veh->m_nModelIndex);
+        const std::string section = properties && !properties->vehName.empty()
+            ? properties->vehName
+            : std::to_string(veh->m_nModelIndex);
 
         if (dataFile.ReadBoolean(section, "TuningFullBodykit", false))
             if (slotsSelected[14] == true || slotsSelected[15] == true || slotsSelected[3] == true)
@@ -536,7 +559,8 @@ void processOccupantGroups(const CVehicle* veh)
     if (veh == NULL)
         return;
 
-    if (vectorHasId(vehVars.useOnlyGroups, veh->m_nModelIndex) || rand<bool>())
+    const auto* properties = findVehProperties(veh->m_nModelIndex);
+    if ((properties && properties->useOnlyGroups) || rand<bool>())
     {
         std::vector<unsigned short> zoneGroups;
 
@@ -549,12 +573,14 @@ void processOccupantGroups(const CVehicle* veh)
             const CWanted* wanted = FindPlayerWanted(-1);
             const unsigned int wantedLevel = wanted ? (wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0)) : 0;
             currentOccupantsModel = veh->m_nModelIndex;
-            if (auto it = vehVars.groupWantedVariations.find(veh->m_nModelIndex); it != vehVars.groupWantedVariations.end())
-                vectorfilterVector(zoneGroups, it->second[wantedLevel]);
-            
-            if (vehVars.activeTimeGroups.contains(veh->m_nModelIndex))
-                for (auto i : vehVars.activeTimeGroups[veh->m_nModelIndex])
-                    vectorfilterVector(zoneGroups, vehVars.timeGroups[veh->m_nModelIndex][i].occupantGroups);
+            if (properties)
+            {
+                if (properties->hasGroupWantedVariations)
+                    vectorfilterVector(zoneGroups, properties->groupWantedVariations[wantedLevel]);
+
+                for (auto i : properties->activeTimeGroups)
+                    vectorfilterVector(zoneGroups, properties->timeGroups[i].occupantGroups);
+            }
 
             currentOccupantsGroup = vectorGetRandom(zoneGroups) - 1;
         }
@@ -563,19 +589,17 @@ void processOccupantGroups(const CVehicle* veh)
 
 int getRandomVariation(const int modelid, bool parked = false)
 {
-    if (modelid < 400)
-        return modelid;
-    auto it = vehVars.currentVariations.find(static_cast<unsigned short>(modelid));
-    if (it == vehVars.currentVariations.end() || it->second.empty())
+    if (modelid < 400 || modelid >= 65536)
         return modelid;
 
-    if (parked == false)
-    {
-        if (vectorHasId(vehVars.parkedCars, modelid))
-            return modelid;
-    }
+    const auto* properties = findVehProperties(static_cast<unsigned short>(modelid));
+    if (!properties || properties->currentVariations.empty())
+        return modelid;
 
-    const unsigned short variationModel = vectorGetRandom(it->second);
+    if (!parked && properties->changeOnlyWhenParked)
+        return modelid;
+
+    const unsigned short variationModel = vectorGetRandom(properties->currentVariations);
     if (variationModel > 0 && variationModel != modelid)
     {
         if (auto loadState = loadModel(variationModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
@@ -597,43 +621,15 @@ int getRandomVariation(const int modelid, bool parked = false)
 
 void VehicleVariations::ClearData()
 {
+    for (auto modelId : vehVars.populatedModels)
+        vehVars.vehById[modelId].reset();
+    vehVars.populatedModels.clear();
+
     vehVars.variations.clear();
-    vehVars.wantedVariations.clear();
-    vehVars.missionVariations.clear();
-    vehVars.currentVariations.clear();
     vehVars.occupantGroups.clear();
     vehVars.trailerZones.clear();
     vehVars.currentTuning = nullptr;
     vehVars.tuning.clear();
-    vehVars.groupWantedVariations.clear();
-    vehVars.drivers.clear();
-    vehVars.passengers.clear();
-
-    for (int i = 0; i < 9; i++)
-    {
-        vehVars.driverGroups[i].clear();
-        vehVars.passengerGroups[i].clear();
-        vehVars.trailers[i].clear();
-    }
-
-    vehVars.timeGroups.clear();
-    vehVars.activeTimeGroups.clear();
-    vehVars.lightPositions.clear();
-    vehVars.lightColors.clear();
-    vehVars.lightColors2.clear();
-    vehVars.lightSizes.clear();
-    vehVars.tuningDriverIds.clear();
-    vehVars.vehModels.clear();
-    vehVars.tuningChances.clear();
-    vehVars.trailersSpawnChances.clear();
-    vehVars.trailersHealth.clear();
-    vehVars.trailersMatchExtras.clear();
-    vehVars.trailersMatchColors.clear();
-
-    vehVars.parkedCars.clear();
-    vehVars.useOnlyGroups.clear();
-
-    vehVars.vehHasVariations.clear();
 
     vehVars.tuningStack.clear();
     vehVars.stack.clear();
@@ -668,20 +664,24 @@ void VehicleVariations::LoadData()
         std::string section(iniData.first);
         Log::Write("%s\n", section.c_str());
         int iModel = 0;
+        bool hasModelName = false;
         if (section[0] >= '0' && section[0] <= '9')
              fromString<int>(section, iModel);
         else
         {
             CModelInfo::GetModelInfo(section.data(), &iModel);
-            if (iModel >= 400)
-                vehVars.vehModels.insert({ (unsigned short)iModel, section });
+            hasModelName = iModel >= 400;
         }
 
         if (iModel >= 400 && iModel < 65535)
         {
             unsigned short modelid = (unsigned short)iModel;
+            auto& properties = getOrCreateVehProperties(modelid);
+            if (hasModelName && properties.vehName.empty())
+                properties.vehName = section;
+
             if (dataFile.ReadBoolean(section, "ChangeOnlyParked", false))
-                vehVars.parkedCars.push_back(modelid);
+                properties.changeOnlyWhenParked = true;
 
             for (auto& kvp : iniData.second)
             {
@@ -691,7 +691,7 @@ void VehicleVariations::LoadData()
 
                     if (!vec.empty())
                     {
-                        vehVars.vehHasVariations.insert(modelid);
+                        properties.hasVariations = true;
                         if (it->second.empty()) //Global
                             for (int k = 0; k < CTheZones::TotalNumberOfInfoZones; k++)
                             {
@@ -768,7 +768,7 @@ void VehicleVariations::LoadData()
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_VEHICLES);
 
                     if (!vec.empty())
-                        vehVars.missionVariations[modelid].insert({ (kvp.first[7] == '_') ? std::string(kvp.first.substr(8)) : std::string(kvp.first), vec });
+                        properties.missionVariations.insert({ (kvp.first[7] == '_') ? std::string(kvp.first.substr(8)) : std::string(kvp.first), vec });
                 }
             }
 
@@ -784,7 +784,7 @@ void VehicleVariations::LoadData()
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_VEHICLES);
                     if (!vec.empty())
                     {
-                        vehVars.vehHasVariations.insert(modelid);
+                        properties.hasVariations = true;
                         vehVars.variations[zoneName][modelid] = mergeZones ? vectorUnion(vehVars.variations[zoneName][modelid], vec) : vec;
                     }
 
@@ -810,7 +810,7 @@ void VehicleVariations::LoadData()
                 auto vec = dataFile.ReadLine(section, "Wanted" + std::to_string(i+1), READ_VEHICLES);
                 if (vec.empty())
                     continue;
-                vehVars.wantedVariations[modelid][i] = vec;
+                properties.wantedVariations[i] = vec;
             }
 
             for (auto &i : vehVars.variations)
@@ -821,11 +821,11 @@ void VehicleVariations::LoadData()
 
 
             const int tuningChance = dataFile.ReadInteger(section, "TuningChance", -1);
-            if (tuningChance > -1)
-                vehVars.tuningChances.insert({ modelid, std::min(tuningChance, 100) });
+            if (tuningChance > -1 && !properties.tuningChances)
+                properties.tuningChances = static_cast<BYTE>(std::min(tuningChance, 100));
 
             if (dataFile.ReadBoolean(section, "UseOnlyGroups", false))
-                vehVars.useOnlyGroups.push_back(modelid);
+                properties.useOnlyGroups = true;
 
             if (vehOptions.enableLights)
             {
@@ -840,27 +840,27 @@ void VehicleVariations::LoadData()
                 int b = dataFile.ReadInteger(section, "LightB", -1);
                 int a = dataFile.ReadInteger(section, "LightA", -1);
 
-                if (lightSize > 0.0)
-                    vehVars.lightSizes.insert({ modelid, lightSize });
+                if (lightSize > 0.0 && !properties.lightSizes)
+                    properties.lightSizes = lightSize;
 
-                if ((uint8_t)r == r && (uint8_t)g == g && (uint8_t)b == b && (uint8_t)a == a)
+                if (!properties.lightColors && (uint8_t)r == r && (uint8_t)g == g && (uint8_t)b == b && (uint8_t)a == a)
                 {
                     RwRGBA colors = { (uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)a };
-                    vehVars.lightColors.insert({ modelid, colors });
+                    properties.lightColors = colors;
                 }
 
-                if (lightX != 0.0 || lightY != 0.0 || lightZ != 0.0 || lightWidth > -900.0)
-                    vehVars.lightPositions.insert({ modelid, {{ lightX, lightY, lightZ }, lightWidth} });
+                if (!properties.lightPositions && (lightX != 0.0 || lightY != 0.0 || lightZ != 0.0 || lightWidth > -900.0))
+                    properties.lightPositions = std::pair<CVector, float>{ { lightX, lightY, lightZ }, lightWidth };
 
                 r = dataFile.ReadInteger(section, "LightR2", -1);
                 g = dataFile.ReadInteger(section, "LightG2", -1);
                 b = dataFile.ReadInteger(section, "LightB2", -1);
                 a = dataFile.ReadInteger(section, "LightA2", -1);
 
-                if ((uint8_t)r == r && (uint8_t)g == g && (uint8_t)b == b && (uint8_t)a == a)
+                if (!properties.lightColors2 && (uint8_t)r == r && (uint8_t)g == g && (uint8_t)b == b && (uint8_t)a == a)
                 {
                     RwRGBA colors = { (uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)a };
-                    vehVars.lightColors2.insert({ modelid, colors });
+                    properties.lightColors2 = colors;
                 }
             }
 
@@ -870,8 +870,9 @@ void VehicleVariations::LoadData()
                 auto vec = dataFile.ReadTrailerLine(section, "Trailers" + std::to_string(j + 1));
                 if (vec.empty())
                     break;
- 
-                vehVars.trailers[j].insert({ modelid, vec });
+
+                if (properties.trailers[j].empty())
+                    properties.trailers[j] = vec;
                 trailersNum++;                   
             }
 
@@ -891,8 +892,10 @@ void VehicleVariations::LoadData()
                     std::vector<unsigned short> vecPassengers = dataFile.ReadLine(section, "PassengerGroup" + std::to_string(j + 1), READ_PEDS);
                     if (!vecPassengers.empty())
                     {
-                        vehVars.passengerGroups[j].insert({ modelid, vecPassengers });
-                        vehVars.driverGroups[j].insert({ modelid, vecDrivers });
+                        if (properties.passengerGroups[j].empty())
+                            properties.passengerGroups[j] = vecPassengers;
+                        if (properties.driverGroups[j].empty())
+                            properties.driverGroups[j] = vecDrivers;
                         numGroups++;
                         continue;
                     }
@@ -906,7 +909,8 @@ void VehicleVariations::LoadData()
                 if (!vec.empty())
                 {
                     checkNumGroups(vec, numGroups);
-                    vehVars.groupWantedVariations[modelid][j] = vec;
+                    properties.groupWantedVariations[j] = vec;
+                    properties.hasGroupWantedVariations = true;
                 }
             }
 
@@ -931,7 +935,7 @@ void VehicleVariations::LoadData()
 
                         if (!vec.empty() || !vec2.empty() || !vec3.empty())
                         {
-                            vehVars.timeGroups[modelid].push_back(vehTimeGroup((unsigned short)groupStart, (unsigned short)groupEnd, vec2, vec3, vec));
+                            properties.timeGroups.push_back(vehTimeGroup((unsigned short)groupStart, (unsigned short)groupEnd, vec2, vec3, vec));
                             continue;
                         }
                     }
@@ -940,12 +944,12 @@ void VehicleVariations::LoadData()
             }
 
             std::vector<unsigned short> vec = dataFile.ReadLine(section, "Drivers", READ_PEDS);
-            if (!vec.empty())
-                vehVars.drivers.insert({ modelid, vec });
+            if (!vec.empty() && properties.drivers.empty())
+                properties.drivers = vec;
 
             vec = dataFile.ReadLine(section, "Passengers", READ_PEDS);
-            if (!vec.empty())
-                vehVars.passengers.insert({ modelid, vec });
+            if (!vec.empty() && properties.passengers.empty())
+                properties.passengers = vec;
 
             vec = dataFile.ReadLine(section, "ParentModel", READ_VEHICLES);
             if (!vec.empty() && vec[0] >= 400)
@@ -953,28 +957,27 @@ void VehicleVariations::LoadData()
 
             vec = dataFile.ReadLine(section, "TrailersMatchExtras", READ_NUMS);
             if (!vec.empty())
-                vehVars.trailersMatchExtras[modelid] = vec;
+                properties.trailersMatchExtras = vec;
 
             vec = dataFile.ReadLine(section, "TrailersMatchColors", READ_NUMS);
             if (!vec.empty())
-                vehVars.trailersMatchColors[modelid] = vec;
+                properties.trailersMatchColors = vec;
 
             vec = dataFile.ReadLine(section, "TuningDriverIDs", READ_PEDS);
             if (!vec.empty())
-                vehVars.tuningDriverIds[modelid] = vec;
+                properties.tuningDriverIds = vec;
 
             const int trailersSpawnChance = dataFile.ReadInteger(section, "TrailersSpawnChance", -1);
-            if (trailersSpawnChance > -1)
-                vehVars.trailersSpawnChances.insert({ modelid, (BYTE)(trailersSpawnChance > 100 ? 100 : trailersSpawnChance) });
+            if (trailersSpawnChance > -1 && !properties.trailersSpawnChances)
+                properties.trailersSpawnChances = static_cast<BYTE>(trailersSpawnChance > 100 ? 100 : trailersSpawnChance);
 
             const short trailersHealth = (short)dataFile.ReadInteger(section, "TrailersHealth", -1);
-            if (trailersHealth > -1)
-                vehVars.trailersHealth.insert({ modelid, trailersHealth });
+            if (trailersHealth > -1 && !properties.trailersHealth)
+                properties.trailersHealth = trailersHealth;
         }
     }
 
-    std::sort(vehVars.parkedCars.begin(), vehVars.parkedCars.end());
-    std::sort(vehVars.useOnlyGroups.begin(), vehVars.useOnlyGroups.end());
+    std::sort(vehVars.populatedModels.begin(), vehVars.populatedModels.end());
 
     for (int i = 0; i < 65536; i++)
         if (vehVars.originalModels[i] == 0)
@@ -989,29 +992,31 @@ void VehicleVariations::Process()
 
     int gameTime = (CClock__ms_nGameClockHours * 100 + CClock__ms_nGameClockMinutes);
 
-    for (auto& it : vehVars.activeTimeGroups)
-        for (auto it2 = it.second.begin(); it2 != it.second.end();)
-        {
-            auto index = *it2;
-
-            if (!isTimeInRange(gameTime, vehVars.timeGroups[it.first][index].start, vehVars.timeGroups[it.first][index].end))
+    for (auto modelId : vehVars.populatedModels)
+        if (auto* properties = findVehProperties(modelId))
+            for (auto it = properties->activeTimeGroups.begin(); it != properties->activeTimeGroups.end();)
             {
-                it2 = it.second.erase(it2);
-                variationsUpdateQueued = it.first;
-            }
-            else
-            {
-                ++it2;
-            }
-        }
+                auto index = *it;
 
-    for (const auto &it : vehVars.timeGroups)
-        for (unsigned int i = 0; i < it.second.size(); i++)
-        {
-            if (isTimeInRange(gameTime, it.second[i].start, it.second[i].end))
-                if (vehVars.activeTimeGroups[it.first].insert((unsigned short)i).second == true)
-                    variationsUpdateQueued = it.first;
-        }
+                if (!isTimeInRange(gameTime, properties->timeGroups[index].start, properties->timeGroups[index].end))
+                {
+                    it = properties->activeTimeGroups.erase(it);
+                    variationsUpdateQueued = modelId;
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+    for (auto modelId : vehVars.populatedModels)
+        if (auto* properties = findVehProperties(modelId))
+            for (unsigned int i = 0; i < properties->timeGroups.size(); i++)
+            {
+                if (isTimeInRange(gameTime, properties->timeGroups[i].start, properties->timeGroups[i].end))
+                    if (properties->activeTimeGroups.insert((unsigned short)i).second == true)
+                        variationsUpdateQueued = modelId;
+            }
 
     if (variationsUpdateQueued > 0)
     {
@@ -1022,12 +1027,13 @@ void VehicleVariations::Process()
         Log::Write("\n");
         if (Log::Write("Active time groups\n"))
         {
-            for (auto it : vehVars.activeTimeGroups)
+            for (auto modelId : vehVars.populatedModels)
             {
-                if (!it.second.empty())
+                const auto* properties = findVehProperties(modelId);
+                if (properties && !properties->activeTimeGroups.empty())
                 {
-                    Log::Write("%d: ", it.first);
-                    for (auto j : it.second)
+                    Log::Write("%d: ", modelId);
+                    for (auto j : properties->activeTimeGroups)
                         Log::Write("%u ", j + 1);
                     Log::Write("\n");
                 }
@@ -1106,8 +1112,8 @@ void VehicleVariations::Process()
         if (!IsVehiclePointerValid(it.first))
             continue;
 
-        auto itDrivers = vehVars.tuningDriverIds.find(it.first->m_nModelIndex);
-        if (itDrivers == vehVars.tuningDriverIds.end() || vectorHasId(itDrivers->second, it.first->m_pDriver == NULL ? 0 : it.first->m_pDriver->m_nModelIndex))
+        const auto* properties = findVehProperties(it.first->m_nModelIndex);
+        if (!properties || properties->tuningDriverIds.empty() || vectorHasId(properties->tuningDriverIds, it.first->m_pDriver == NULL ? 0 : it.first->m_pDriver->m_nModelIndex))
             for (int selectedPart : it.second)
                 if (selectedPart > -1)
                 {
@@ -1150,11 +1156,12 @@ void VehicleVariations::Process()
         if (!IsVehiclePointerValid(veh) || veh->m_nCreatedBy == eVehicleCreatedBy::MISSION_VEHICLE)
             continue;
 
-        if (auto x = vehVars.currentVariations.find(veh->m_nModelIndex); x != vehVars.currentVariations.end() && !x->second.empty() && x->second[0] == 0)
+        const auto* properties = findVehProperties(veh->m_nModelIndex);
+        if (properties && !properties->currentVariations.empty() && properties->currentVariations[0] == 0)
             DestroyVehicleAndDriverAndPassengers(veh);
         else
         {
-            if (auto it = vehVars.passengers.find(veh->m_nModelIndex); it != vehVars.passengers.end() && it->second[0] == 0)
+            if (properties && !properties->passengers.empty() && properties->passengers[0] == 0)
                 for (int i = 0; i < 8; i++)
                 {
                     CPed* passenger = veh->m_apPassengers[i];
@@ -1166,11 +1173,10 @@ void VehicleVariations::Process()
                     }
                 }
 
-            const auto trailersSpawnChance = vehVars.trailersSpawnChances.find(veh->m_nModelIndex);
-            bool spawnTrailer = (rand<uint32_t>(0, 3) == 0 ? true : false);
+            bool spawnTrailer = rand<uint32_t>(0, 3) == 0;
 
-            if (trailersSpawnChance != vehVars.trailersSpawnChances.end())
-                spawnTrailer = (trailersSpawnChance->second == 0) ? false : ((rand<uint32_t>(0, 100) < trailersSpawnChance->second) ? true : false);
+            if (properties && properties->trailersSpawnChances)
+                spawnTrailer = rand<uint32_t>(0, 100) < *properties->trailersSpawnChances;
 
             for (auto &i : spawnedTrailers)
                 if (!i.second.empty() && i.second[0] == veh && veh->m_pTractor && isAnotherVehicleBehind(veh, i.second))
@@ -1189,9 +1195,9 @@ void VehicleVariations::Process()
                     if (auto it2 = it->second.find(veh->m_nModelIndex); it2 != it->second.end())
                         zoneTrailers = it2->second;
 
-                if (vehVars.activeTimeGroups.contains(veh->m_nModelIndex))
-                    for (auto i : vehVars.activeTimeGroups[veh->m_nModelIndex])
-                        vectorfilterVector(zoneTrailers, vehVars.timeGroups[veh->m_nModelIndex][i].trailers);
+                if (properties)
+                    for (auto i : properties->activeTimeGroups)
+                        vectorfilterVector(zoneTrailers, properties->timeGroups[i].trailers);
 
                 if (zoneTrailers.empty())
                     continue;
@@ -1199,17 +1205,17 @@ void VehicleVariations::Process()
                 auto trailerConfigSelected = vectorGetRandom(zoneTrailers) - 1;
                 if (trailerConfigSelected < 0)
                     continue;
-                auto it = vehVars.trailers[trailerConfigSelected].find(veh->m_nModelIndex);
-                if (it == vehVars.trailers[trailerConfigSelected].end())
+                if (!properties || properties->trailers[trailerConfigSelected].empty())
                     continue;
 
                 CVehicle* previous = veh;
                 CCarCtrl::SwitchVehicleToRealPhysics(veh);
 
-                bool trailerMatchExtras = vehVars.trailersMatchExtras.contains(veh->m_nModelIndex) && vectorHasId(vehVars.trailersMatchExtras[veh->m_nModelIndex], trailerConfigSelected + 1);
-                bool trailerMatchColors = vehVars.trailersMatchColors.contains(veh->m_nModelIndex) && vectorHasId(vehVars.trailersMatchColors[veh->m_nModelIndex], trailerConfigSelected + 1);
+                bool trailerMatchExtras = vectorHasId(properties->trailersMatchExtras, trailerConfigSelected + 1);
+                bool trailerMatchColors = vectorHasId(properties->trailersMatchColors, trailerConfigSelected + 1);
 
-                const std::vector<unsigned short> &trailersVec = it->second[CGeneral::GetRandomNumberInRange(0, (int)it->second.size())];
+                const auto& trailerConfigurations = properties->trailers[trailerConfigSelected];
+                const std::vector<unsigned short> &trailersVec = trailerConfigurations[CGeneral::GetRandomNumberInRange(0, (int)trailerConfigurations.size())];
                 CVehicle* firstTrailer = NULL;
                 for (auto trailerModel : trailersVec)
                 {
@@ -1243,8 +1249,8 @@ void VehicleVariations::Process()
                                 Log::Write("SetTowLink() failed for vehicle %d and trailer %d.\n", veh->m_nModelIndex, trailer->m_nModelIndex);
 
                         previous = trailer;
-                        if (vehVars.trailersHealth.contains(veh->m_nModelIndex))
-                            trailer->m_fHealth = (float)vehVars.trailersHealth[veh->m_nModelIndex];
+                        if (properties->trailersHealth)
+                            trailer->m_fHealth = static_cast<float>(*properties->trailersHealth);
 
                         if (trailerMatchColors)
                         {
@@ -1269,7 +1275,10 @@ void VehicleVariations::UpdateVariations()
 {
     const CWanted* wanted = FindPlayerWanted(-1);
     vehVars.currentTuning = nullptr;
-    vehVars.currentVariations.clear();
+
+    for (auto modelId : vehVars.populatedModels)
+        if (auto* properties = findVehProperties(modelId))
+            properties->currentVariations.clear();
 
     auto currentZoneTuning = vehVars.tuning.find(*reinterpret_cast<uint64_t*>(currentZone));
     auto currentZoneVariations = vehVars.variations.find(*reinterpret_cast<uint64_t*>(currentZone));
@@ -1280,36 +1289,36 @@ void VehicleVariations::UpdateVariations()
     if (currentZoneVariations == vehVars.variations.end())
         return;
 
-    for (auto& modelid : vehVars.vehHasVariations)
+    for (auto modelid : vehVars.populatedModels)
     {
+        auto* properties = findVehProperties(modelid);
+        if (!properties || !properties->hasVariations)
+            continue;
+
         if (auto it = currentZoneVariations->second.find(modelid); it != currentZoneVariations->second.end())
-            vehVars.currentVariations[modelid] = it->second;
+            properties->currentVariations = it->second;
 
         if (wanted)
         {
             const unsigned int wantedLevel = wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0);
-            if (auto it = vehVars.wantedVariations.find(modelid); it != vehVars.wantedVariations.end())
-            {
-                if (!it->second[wantedLevel].empty() && !vehVars.currentVariations[modelid].empty())
-                    vectorfilterVector(vehVars.currentVariations[modelid], it->second[wantedLevel]);
-            }
+            if (!properties->wantedVariations[wantedLevel].empty() && !properties->currentVariations.empty())
+                vectorfilterVector(properties->currentVariations, properties->wantedVariations[wantedLevel]);
         }
 
-        if (vehVars.activeTimeGroups.contains(modelid))
-            for (auto i : vehVars.activeTimeGroups[modelid])
-                vectorfilterVector(vehVars.currentVariations[modelid], vehVars.timeGroups[modelid][i].variations);
+        for (auto i : properties->activeTimeGroups)
+            vectorfilterVector(properties->currentVariations, properties->timeGroups[i].variations);
 
-        if (auto it = vehVars.missionVariations.find(modelid); it != vehVars.missionVariations.end())
+        if (!properties->missionVariations.empty())
         {
             if (!CTheScripts__IsPlayerOnAMission())
             {
-                if (auto it2 = it->second.find("MISSIONGAMEPLAY"); it2 != it->second.end())
-                    vectorfilterVector(vehVars.currentVariations[modelid], it2->second);
+                if (auto it2 = properties->missionVariations.find("MISSIONGAMEPLAY"); it2 != properties->missionVariations.end())
+                    vectorfilterVector(properties->currentVariations, it2->second);
             }
-            else if (auto it2 = it->second.find(currentMission); it2 != it->second.end())
-                vectorfilterVector(vehVars.currentVariations[modelid], it2->second);
-            else if (auto it3 = it->second.find("MISSIONALL"); it3 != it->second.end())
-                vectorfilterVector(vehVars.currentVariations[modelid], it3->second);
+            else if (auto it2 = properties->missionVariations.find(currentMission); it2 != properties->missionVariations.end())
+                vectorfilterVector(properties->currentVariations, it2->second);
+            else if (auto it3 = properties->missionVariations.find("MISSIONALL"); it3 != properties->missionVariations.end())
+                vectorfilterVector(properties->currentVariations, it3->second);
         }
     }
 }
@@ -1432,17 +1441,25 @@ void VehicleVariations::LogCurrentVariations()
     if (!Log::Write("vehCurrentVariations"))
         return;
 
-    if (vehVars.currentVariations.empty())
+    bool hasCurrentVariations = false;
+    for (auto modelId : vehVars.populatedModels)
+        if (const auto* properties = findVehProperties(modelId); properties && !properties->currentVariations.empty())
+        {
+            hasCurrentVariations = true;
+            break;
+        }
+
+    if (!hasCurrentVariations)
         Log::Write(" is empty\n");
     else
         Log::Write("\n");
 
-    for (auto it : vehVars.currentVariations)
-        if (!it.second.empty())
+    for (auto modelId : vehVars.populatedModels)
+        if (const auto* properties = findVehProperties(modelId); properties && !properties->currentVariations.empty())
         {
-            Log::Write("%d: ", it.first);
-            for (auto j : it.second)
-                Log::Write("%u ", j);
+            Log::Write("%d: ", modelId);
+            for (auto variation : properties->currentVariations)
+                Log::Write("%u ", variation);
             Log::Write("\n");
         }
 }
@@ -1787,9 +1804,10 @@ __declspec(noinline) CCopPed* __fastcall CCopPedHooked(CCopPed* ped, void*, int 
 
     if (currentOccupantsGroup > -1 && currentOccupantsGroup < 9 && currentOccupantsModel > 0)
     {
-        if (auto it = vehVars.driverGroups[currentOccupantsGroup].find(currentOccupantsModel); it != vehVars.driverGroups[currentOccupantsGroup].end())
+        const auto* properties = findVehProperties(currentOccupantsModel);
+        if (properties && !properties->driverGroups[currentOccupantsGroup].empty())
         {
-            auto driver = vectorGetRandom(it->second);
+            auto driver = vectorGetRandom(properties->driverGroups[currentOccupantsGroup]);
             if (auto loadState = loadModel(driver, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
             {
                 Log::Write("Error loading ped model %d (%s) %s\n", driver, modelNames.contains(driver) ? modelNames[driver].c_str() : "", getLoadStateString(loadState));
@@ -1854,33 +1872,32 @@ __declspec(noinline) CPed* __cdecl AddPedInCarHooked(CVehicle* veh, char driver,
     if (veh == NULL)
         return NULL;
 
-    std::string section;
-    if (auto it = vehVars.vehModels.find(veh->m_nModelIndex); it != vehVars.vehModels.end())
-        section = it->second;
-    else
-        section = std::to_string(veh->m_nModelIndex);
+    const auto* vehicleProperties = findVehProperties(veh->m_nModelIndex);
+    const std::string section = vehicleProperties && !vehicleProperties->vehName.empty() ? vehicleProperties->vehName : std::to_string(veh->m_nModelIndex);
 
     if (driver)
     {
         const bool replaceDriver = dataFile.ReadBoolean(section, "ReplaceDriver", false) ? true : rand<bool>();
         if (currentOccupantsGroup > -1 && currentOccupantsGroup < 9 && currentOccupantsModel > 0)
         {
-            if (auto it = vehVars.driverGroups[currentOccupantsGroup].find(currentOccupantsModel); it != vehVars.driverGroups[currentOccupantsGroup].end())
-                occupantModelIndex = vectorGetRandom(it->second);
+            const auto* properties = findVehProperties(currentOccupantsModel);
+            if (properties && !properties->driverGroups[currentOccupantsGroup].empty())
+                occupantModelIndex = vectorGetRandom(properties->driverGroups[currentOccupantsGroup]);
         }
-        else if (auto it = vehVars.drivers.find(veh->m_nModelIndex); it != vehVars.drivers.end() && replaceDriver)
-            occupantModelIndex = vectorGetRandom(it->second);
+        else if (vehicleProperties && !vehicleProperties->drivers.empty() && replaceDriver)
+            occupantModelIndex = vectorGetRandom(vehicleProperties->drivers);
     }
     else
     {
         const bool replacePassenger = dataFile.ReadBoolean(section, "ReplacePassengers", false) ? true : rand<bool>();
         if (currentOccupantsGroup > -1 && currentOccupantsGroup < 9 && currentOccupantsModel > 0)
         {
-            if (auto it = vehVars.passengerGroups[currentOccupantsGroup].find(currentOccupantsModel); it != vehVars.passengerGroups[currentOccupantsGroup].end())
-                occupantModelIndex = vectorGetRandom(it->second);
+            const auto* properties = findVehProperties(currentOccupantsModel);
+            if (properties && !properties->passengerGroups[currentOccupantsGroup].empty())
+                occupantModelIndex = vectorGetRandom(properties->passengerGroups[currentOccupantsGroup]);
         }
-        else if (auto it = vehVars.passengers.find(veh->m_nModelIndex); it != vehVars.passengers.end() && replacePassenger)
-            occupantModelIndex = vectorGetRandom(it->second);
+        else if (vehicleProperties && !vehicleProperties->passengers.empty() && replacePassenger)
+            occupantModelIndex = vectorGetRandom(vehicleProperties->passengers);
     }
 
     const auto model = veh->m_nModelIndex;
@@ -2313,40 +2330,36 @@ __declspec(noinline) void __cdecl RegisterCoronaHooked(void* _this, CEntity* a2,
     if (!a2 || !coors)
         return originalCall.call(_this, a2, red, green, blue, alpha, coors, size, a9, texture, a11, a12, a13, a14, a15, a16, a17, a18, a19, a20, a21);
 
+    const auto* properties = findVehProperties(lightsModel);
+
     //size
-    {
-        const auto it = vehVars.lightSizes.find(lightsModel);
-        if (it != vehVars.lightSizes.end())
-            size = it->second;
-    }
+    if (properties && properties->lightSizes)
+        size = *properties->lightSizes;
 
     //position
+    if (properties && properties->lightPositions)
     {
-        const auto it = vehVars.lightPositions.find(lightsModel);
-        if (it != vehVars.lightPositions.end())
-        {
-            if (it->second.second > -900.0)
-                coors->x *= it->second.second;
-            if (it->second.first.x != 0.0)
-                coors->x += it->second.first.x;
-            if (it->second.first.y != 0.0)
-                coors->y += it->second.first.y;
-            if (it->second.first.z != 0.0)
-                coors->z += it->second.first.z;
-        }
+        const auto& position = *properties->lightPositions;
+        if (position.second > -900.0)
+            coors->x *= position.second;
+        if (position.first.x != 0.0)
+            coors->x += position.first.x;
+        if (position.first.y != 0.0)
+            coors->y += position.first.y;
+        if (position.first.z != 0.0)
+            coors->z += position.first.z;
     }
 
     //colors
+    if (properties)
     {
-        auto& lightsMap = (second ? vehVars.lightColors2 : vehVars.lightColors);
-
-        const auto it = lightsMap.find(lightsModel);
-        if (it != lightsMap.end())
+        const auto& color = second ? properties->lightColors2 : properties->lightColors;
+        if (color)
         {
-            red = it->second.red;
-            green = it->second.green;
-            blue = it->second.blue;
-            alpha = it->second.alpha;
+            red = color->red;
+            green = color->green;
+            blue = color->blue;
+            alpha = color->alpha;
         }
     }
 
@@ -2360,22 +2373,22 @@ __declspec(noinline) void __cdecl AddLightHooked(char type, float x, float y, fl
 
     if (lightsModel > 0)
     {
-        const auto it = vehVars.lightPositions.find(lightsModel);
-        if (it != vehVars.lightPositions.end())
+        const auto* properties = findVehProperties(lightsModel);
+        if (properties && properties->lightPositions)
         {
-            if (it->second.second > -900.0f)
-                x *= it->second.second;
-            if (it->second.first.x != 0.0f)
-                x += it->second.first.x;
-            if (it->second.first.y != 0.0f)
-                y += it->second.first.y;
-            if (it->second.first.z != 0.0f)
-                z += it->second.first.z;
+            const auto& position = *properties->lightPositions;
+            if (position.second > -900.0f)
+                x *= position.second;
+            if (position.first.x != 0.0f)
+                x += position.first.x;
+            if (position.first.y != 0.0f)
+                y += position.first.y;
+            if (position.first.z != 0.0f)
+                z += position.first.z;
         }
 
-        const auto it2 = vehVars.lightSizes.find(lightsModel);
-        if (it2 != vehVars.lightSizes.end())
-            radius = it2->second;
+        if (properties && properties->lightSizes)
+            radius = *properties->lightSizes;
     }
 
     originalCall.call(type, x, y, z, dir_x, dir_y, dir_z, radius, r, g, b, fogType, generateExtraShadows, attachedTo);
