@@ -20,42 +20,69 @@
 #include <CWorld.h>
 
 #include <array>
-#include <map>
 #include <chrono>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
 
 static const char* dataFileName = "ModelVariations_Peds.ini";
 static DataReader dataFile;
 std::vector<int16_t> destroyedModelCounters;
 
+struct pedVariationProperties {
+    std::optional<unsigned int> animGroup;
+    unsigned short originalModel = 0;
+
+    std::array<std::vector<unsigned short>, 6> wantedVariations;
+    std::unordered_map<std::string, std::vector<unsigned short>> missionVariations;
+    std::vector<unsigned short> currentVariations;
+    std::vector<pedTimeGroup> timeGroups;
+    std::set<unsigned short> activeTimeGroups;
+
+    std::vector<unsigned short> voices;
+
+    std::vector<unsigned short> weatherSunny;
+    std::vector<unsigned short> weatherRainy;
+    std::vector<unsigned short> weatherFoggy;
+    std::vector<unsigned short> weatherSandstorm;
+    std::vector<unsigned short> weatherWindy;
+
+    // An absent override falls back to the global UseParentVoices setting.
+    std::optional<bool> useParentVoice;
+    bool hasVariations = false;
+    bool disableOnMission = false;
+    bool dontInheritBehaviour = false;
+    bool mergeInteriors = false;
+};
+
 struct tPedVars {
+    std::array<std::unique_ptr<pedVariationProperties>, 65536> pedById{};
+    std::vector<unsigned short> populatedModels;
+
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
-    std::unordered_map<unsigned short, std::array<std::vector<unsigned short>, 6>> wantedVariations;
-    std::unordered_map<unsigned short, std::unordered_map<std::string, std::vector<unsigned short>>> missionVariations;
-    std::map<unsigned short, std::vector<unsigned short>> currentVariations;
-    std::unordered_map<unsigned short, std::vector<pedTimeGroup>> timeGroups;
-    std::unordered_map<unsigned short, std::set<unsigned short>> activeTimeGroups;
-
-
-    std::unordered_map<unsigned short, unsigned short> originalModels;
-    std::unordered_map<unsigned short, bool> useParentVoice;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> voices;
-    std::unordered_map<unsigned short, unsigned int> animGroups;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> weatherSunny;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> weatherRainy;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> weatherFoggy;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> weatherSandstorm;
-    std::unordered_map<unsigned short, std::vector<unsigned short>> weatherWindy;
-
-    std::set<unsigned short> pedHasVariations;
 
     std::vector<CPed*> stack;
-
-    std::vector<unsigned short> disableOnMission;
-    std::vector<unsigned short> dontInheritBehaviourModels;
-    std::vector<unsigned short> mergeInteriors;
 };
 
 static tPedVars pedVars;
+
+static pedVariationProperties* findPedProperties(unsigned short modelId) noexcept
+{
+    return pedVars.pedById[modelId].get();
+}
+
+static pedVariationProperties& getOrCreatePedProperties(unsigned short modelId)
+{
+    auto& properties = pedVars.pedById[modelId];
+    if (!properties)
+    {
+        properties = std::make_unique<pedVariationProperties>();
+        pedVars.populatedModels.push_back(modelId);
+    }
+
+    return *properties;
+}
 
 
 struct tPedOptions {
@@ -92,14 +119,15 @@ bool isValidPedId(int id)
 
 unsigned short PedVariations::GetVariationOriginalModel(const int modelIndex)
 {
-    auto it = pedVars.originalModels.find((unsigned short)modelIndex);
-    if (it != pedVars.originalModels.end())
-        return it->second;
+    const auto id = static_cast<unsigned short>(modelIndex);
+    const auto* properties = findPedProperties(id);
+    if (properties && properties->originalModel > 0)
+        return properties->originalModel;
 
-    return { (unsigned short)modelIndex };
+    return id;
 }
 
-bool isPedVisible(CPed* ped) 
+bool isPedVisible(CPed* ped)
 {
     if (ped == NULL)
         return false;
@@ -144,31 +172,12 @@ bool canPedDriveVeh(int pedModel, int vehModel)
 
 void PedVariations::ClearData()
 {
+    for (auto modelId : pedVars.populatedModels)
+        pedVars.pedById[modelId].reset();
+    pedVars.populatedModels.clear();
+
     pedVars.variations.clear();
-    pedVars.wantedVariations.clear();
-    pedVars.missionVariations.clear();
-    pedVars.currentVariations.clear();
-    pedVars.timeGroups.clear();
-    pedVars.activeTimeGroups.clear();
-
-
-    pedVars.originalModels.clear();
-    pedVars.useParentVoice.clear();
-    pedVars.voices.clear();
-    pedVars.animGroups.clear();
-    pedVars.weatherSunny.clear();
-    pedVars.weatherRainy.clear();
-    pedVars.weatherFoggy.clear();
-    pedVars.weatherSandstorm.clear();
-    pedVars.weatherWindy.clear();
-
-    pedVars.pedHasVariations.clear();
-
     pedVars.stack.clear();
-
-    pedVars.disableOnMission.clear();
-    pedVars.dontInheritBehaviourModels.clear();
-    pedVars.mergeInteriors.clear();
 
     pedOptions = {};
 
@@ -196,6 +205,8 @@ void PedVariations::LoadData()
             continue;
 
         unsigned short modelIndex = static_cast<unsigned short>(i);
+        auto& properties = getOrCreatePedProperties(modelIndex);
+
         if (isValidPedId(modelIndex))
         {
             for (auto& kvp : iniData.second)
@@ -206,7 +217,7 @@ void PedVariations::LoadData()
 
                     if (!vec.empty())
                     {
-                        pedVars.pedHasVariations.insert(modelIndex);
+                        properties.hasVariations = true;
                         if (it->second.empty()) //Global
                         {
                             for (int k = 0; k < CTheZones::TotalNumberOfInfoZones; k++)
@@ -228,7 +239,7 @@ void PedVariations::LoadData()
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_PEDS);
 
                     if (!vec.empty())
-                        pedVars.missionVariations[modelIndex].insert({ (kvp.first[7] == '_') ? std::string(kvp.first.substr(8)) : std::string(kvp.first), vec });
+                        properties.missionVariations.insert({ (kvp.first[7] == '_') ? std::string(kvp.first.substr(8)) : std::string(kvp.first), vec });
                 }
             }
 
@@ -241,7 +252,7 @@ void PedVariations::LoadData()
                     auto vec = dataFile.ReadLine(section, kvp.first, READ_PEDS);
                     if (!vec.empty())
                     {
-                        pedVars.pedHasVariations.insert(modelIndex);
+                        properties.hasVariations = true;
                         uint64_t zoneName = 0;
                         copyString((char*)&zoneName, kvp.first.data(), std::min<std::size_t>(8, kvp.first.size()));
                         pedVars.variations[zoneName][modelIndex] = mergeZones ? vectorUnion(pedVars.variations[zoneName][modelIndex], vec) : vec;
@@ -254,14 +265,18 @@ void PedVariations::LoadData()
                 auto vec = dataFile.ReadLine(section, "Wanted" + std::to_string(j+1), READ_PEDS);
                 if (vec.empty())
                     continue;
-                pedVars.wantedVariations[modelIndex][j] = vec;
+                properties.wantedVariations[j] = vec;
             }
 
             for (const auto& j : pedVars.variations)
                 if (auto it = j.second.find(modelIndex); it != j.second.end())
                     for (auto variation : it->second)
                         if (variation > 0 && variation != modelIndex)
-                            pedVars.originalModels.insert({ variation, modelIndex });
+                        {
+                            auto& variationProperties = getOrCreatePedProperties(variation);
+                            if (variationProperties.originalModel == 0)
+                                variationProperties.originalModel = modelIndex;
+                        }
 
             for (unsigned int j = 0; j < 9; j++)
             {
@@ -275,7 +290,7 @@ void PedVariations::LoadData()
 
                         if (!vec.empty())
                         {
-                            pedVars.timeGroups[modelIndex].push_back(pedTimeGroup((unsigned short)groupStart, (unsigned short)groupEnd, vec));
+                            properties.timeGroups.push_back(pedTimeGroup((unsigned short)groupStart, (unsigned short)groupEnd, vec));
                             continue;
                         }
                     }
@@ -284,38 +299,38 @@ void PedVariations::LoadData()
             }
 
             if (dataFile.ReadBoolean(section, "DontInheritBehaviour", false))
-                pedVars.dontInheritBehaviourModels.push_back(modelIndex);
+                properties.dontInheritBehaviour = true;
 
             if (dataFile.ReadBoolean(section, "MergeInteriorsWithAreasAndZones", false))
-                pedVars.mergeInteriors.push_back(modelIndex);
+                properties.mergeInteriors = true;
 
             if (dataFile.ReadBoolean(section, "DisableOnMission", false))
-                pedVars.disableOnMission.push_back(modelIndex);
+                properties.disableOnMission = true;
         }
-        
+
         auto vec = dataFile.ReadLine(section, "WeatherSunny", READ_PEDS);
         if (!vec.empty())
-            pedVars.weatherSunny[modelIndex] = vec;
+            properties.weatherSunny = vec;
 
         vec = dataFile.ReadLine(section, "WeatherRainy", READ_PEDS);
         if (!vec.empty())
-            pedVars.weatherRainy[modelIndex] = vec;
+            properties.weatherRainy = vec;
 
         vec = dataFile.ReadLine(section, "WeatherFoggy", READ_PEDS);
         if (!vec.empty())
-            pedVars.weatherFoggy[modelIndex] = vec;
+            properties.weatherFoggy = vec;
 
         vec = dataFile.ReadLine(section, "WeatherSandstorm", READ_PEDS);
         if (!vec.empty())
-            pedVars.weatherSandstorm[modelIndex] = vec;
+            properties.weatherSandstorm = vec;
 
         vec = dataFile.ReadLine(section, "WeatherWindy", READ_PEDS);
         if (!vec.empty())
-            pedVars.weatherWindy[modelIndex] = vec;
+            properties.weatherWindy = vec;
 
         int parentVoice = dataFile.ReadInteger(section, "UseParentVoice", -1);
         if (parentVoice > -1)
-            pedVars.useParentVoice[modelIndex] = static_cast<bool>(parentVoice);
+            properties.useParentVoice = static_cast<bool>(parentVoice);
 
         std::string animGroupString = dataFile.ReadString(section, "AnimGroup", "");
         if (!animGroupString.empty() && CAnimManager__ms_numAnimAssocDefinitions > 0)
@@ -324,19 +339,15 @@ void PedVariations::LoadData()
                 const char* animString = CAnimManager__GetAnimGroupName(j);
                 if (animString != NULL && strcmp(animGroupString.c_str(), animString) == 0)
                 {
-                    pedVars.animGroups[modelIndex] = (unsigned)j;
+                    properties.animGroup = static_cast<unsigned int>(j);
                     break;
                 }
             }
 
         vec = dataFile.ReadLine(section, "Voice", READ_PEDS);
-        if (!vec.empty())
-            pedVars.voices.insert({ modelIndex, vec });
+        if (!vec.empty() && properties.voices.empty())
+            properties.voices = vec;
     }
-
-    std::sort(pedVars.dontInheritBehaviourModels.begin(), pedVars.dontInheritBehaviourModels.end());
-    std::sort(pedVars.mergeInteriors.begin(), pedVars.mergeInteriors.end());
-    std::sort(pedVars.disableOnMission.begin(), pedVars.disableOnMission.end());
 
     pedOptions.useParentVoices = dataFile.ReadBoolean("Settings", "UseParentVoices", false);
     pedOptions.improveCivilianVariety = dataFile.ReadBoolean("Settings", "ImproveCivilianVariety", false);
@@ -368,25 +379,27 @@ void PedVariations::Process()
     if (gameTime != lastGameTime)
     {
         lastGameTime = gameTime;
-        for (auto& it : pedVars.activeTimeGroups)
-            for (auto it2 = it.second.begin(); it2 != it.second.end();)
-            {
-                unsigned short index = *it2;
-
-                if (!isTimeInRange(gameTime, pedVars.timeGroups[it.first][index].start, pedVars.timeGroups[it.first][index].end))
+        for (auto modelId : pedVars.populatedModels)
+            if (auto* properties = findPedProperties(modelId))
+                for (auto it = properties->activeTimeGroups.begin(); it != properties->activeTimeGroups.end();)
                 {
-                    it2 = it.second.erase(it2);
-                    variationsUpdateQueued = it.first;
-                }
-                else
-                    ++it2;
-            }
+                    const unsigned short index = *it;
 
-        for (const auto& it : pedVars.timeGroups)
-            for (unsigned int i = 0; i < it.second.size(); i++)
-                if (isTimeInRange(gameTime, it.second[i].start, it.second[i].end))
-                    if (pedVars.activeTimeGroups[it.first].insert((unsigned short)i).second == true)
-                        variationsUpdateQueued = it.first;
+                    if (!isTimeInRange(gameTime, properties->timeGroups[index].start, properties->timeGroups[index].end))
+                    {
+                        it = properties->activeTimeGroups.erase(it);
+                        variationsUpdateQueued = modelId;
+                    }
+                    else
+                        ++it;
+                }
+
+        for (auto modelId : pedVars.populatedModels)
+            if (auto* properties = findPedProperties(modelId))
+                for (unsigned int i = 0; i < properties->timeGroups.size(); i++)
+                    if (isTimeInRange(gameTime, properties->timeGroups[i].start, properties->timeGroups[i].end))
+                        if (properties->activeTimeGroups.insert(static_cast<unsigned short>(i)).second)
+                            variationsUpdateQueued = modelId;
     }
 
     if (weatherChanged)
@@ -407,11 +420,11 @@ void PedVariations::Process()
         PedVariations::LogCurrentVariations();
         Log::Write("\n");
         Log::Write("Active time groups\n");
-        for (auto it : pedVars.activeTimeGroups)
-            if (!it.second.empty())
+        for (auto modelId : pedVars.populatedModels)
+            if (const auto* properties = findPedProperties(modelId); properties && !properties->activeTimeGroups.empty())
             {
-                Log::Write("%d: ", it.first);
-                for (auto j : it.second)
+                Log::Write("%u: ", modelId);
+                for (auto j : properties->activeTimeGroups)
                     Log::Write("%u ", j + 1);
                 Log::Write("\n");
             }
@@ -433,8 +446,8 @@ void PedVariations::Process()
 
         if (IsPedPointerValid(ped) && isValidPedId(ped->m_nModelIndex))
         {
-            auto it = pedVars.currentVariations.find(ped->m_nModelIndex);
-            if (it != pedVars.currentVariations.end() && !it->second.empty() && it->second[0] == 0 && ped->m_nCreatedBy != 2) //Delete models with a 0 id variation
+            const auto* properties = findPedProperties(ped->m_nModelIndex);
+            if (properties && !properties->currentVariations.empty() && properties->currentVariations[0] == 0 && ped->m_nCreatedBy != 2) //Delete models with a 0 id variation
             {
                 CVehicle* veh = ped->m_pVehicle;
                 if (IsVehiclePointerValid(veh) && veh->m_nCreatedBy != eVehicleCreatedBy::MISSION_VEHICLE && veh->m_pDriver == ped)
@@ -460,15 +473,15 @@ void PedVariations::ProcessDrugDealers(bool reset)
         if (dealersFrames == 10)
         {
             Log::Write("Applying drug dealer fix...\n");
-         
-            for (auto& it : pedVars.originalModels)
-                if (it.first > 300)
-                    if (it.second == 28 || it.second == 29 || it.second == 30 || it.second == 254)
+
+            for (auto modelId : pedVars.populatedModels)
+                if (const auto* properties = findPedProperties(modelId); properties && modelId > 300)
+                    if (properties->originalModel == 28 || properties->originalModel == 29 || properties->originalModel == 30 || properties->originalModel == 254)
                     {
-                        Log::Write(addedIDs.contains(it.first) ? "%uSP\n" : "%u\n", it.first);
+                        Log::Write(addedIDs.contains(modelId) ? "%uSP\n" : "%u\n", modelId);
                         auto findByScmIndex = CExternalScripts__findByScmIndex(CTheScripts__StreamedScripts, 19);
 
-                        CScriptsForBrains__AddNewScriptBrain(CTheScripts__ScriptsForBrains, findByScmIndex, (short)it.first, 100, 0, -1, -1.0);
+                        CScriptsForBrains__AddNewScriptBrain(CTheScripts__ScriptsForBrains, findByScmIndex, static_cast<short>(modelId), 100, 0, -1, -1.0);
                     }
 
             Log::Write("\n");
@@ -481,84 +494,66 @@ void PedVariations::UpdateVariations()
 {
     const CWanted* wanted = FindPlayerWanted(-1);
     const unsigned int wantedLevel = wanted ? (wanted->m_nWantedLevel - (wanted->m_nWantedLevel ? 1 : 0)) : 65535;
-    pedVars.currentVariations.clear();
+
+    for (auto modelId : pedVars.populatedModels)
+        if (auto* properties = findPedProperties(modelId))
+            properties->currentVariations.clear();
 
     auto player = FindPlayerPed();
     auto interiorVariations = (player->m_pEnex) ? pedVars.variations.find(*reinterpret_cast<const uint64_t*>(player->m_pEnex)) : pedVars.variations.end();
     auto zoneVariations = pedVars.variations.find(*reinterpret_cast<uint64_t*>(currentZone));
-    
-    for (auto& modelid : pedVars.pedHasVariations)
+
+    for (auto modelId : pedVars.populatedModels)
     {
+        auto* properties = findPedProperties(modelId);
+        if (!properties || !properties->hasVariations)
+            continue;
+
         bool modelHasInteriorVariations = false;
 
         if (interiorVariations != pedVars.variations.end())
-            if (auto it = interiorVariations->second.find(modelid); it != interiorVariations->second.end())
+            if (auto it = interiorVariations->second.find(modelId); it != interiorVariations->second.end())
             {
-                pedVars.currentVariations[modelid] = it->second;
+                properties->currentVariations = it->second;
                 modelHasInteriorVariations = true;
             }
 
-        if ((!modelHasInteriorVariations || vectorHasId(pedVars.mergeInteriors, modelid)) && zoneVariations != pedVars.variations.end())
-            if (auto it = zoneVariations->second.find(modelid); it != zoneVariations->second.end())
-                pedVars.currentVariations[modelid] = vectorUnion(it->second, pedVars.currentVariations[modelid]);
+        if ((!modelHasInteriorVariations || properties->mergeInteriors) && zoneVariations != pedVars.variations.end())
+            if (auto it = zoneVariations->second.find(modelId); it != zoneVariations->second.end())
+                properties->currentVariations = vectorUnion(it->second, properties->currentVariations);
 
-        if (wantedLevel < 6)
-            if (auto it = pedVars.wantedVariations.find(modelid); it != pedVars.wantedVariations.end())
-            {
-                if (!it->second[wantedLevel].empty() && !pedVars.currentVariations[modelid].empty())
-                    vectorfilterVector(pedVars.currentVariations[modelid], it->second[wantedLevel]);
-            }
+        if (wantedLevel < 6 && !properties->wantedVariations[wantedLevel].empty() && !properties->currentVariations.empty())
+            vectorfilterVector(properties->currentVariations, properties->wantedVariations[wantedLevel]);
 
-        if (weatherState.isRainy)
-        {
-            auto it = pedVars.weatherRainy.find(modelid);
-            if (it != pedVars.weatherRainy.end() && !it->second.empty())
-                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
-        }
+        if (weatherState.isRainy && !properties->weatherRainy.empty())
+            vectorfilterVector(properties->currentVariations, properties->weatherRainy);
 
-        if (weatherState.isSandstorm)
-        {
-            auto it = pedVars.weatherSandstorm.find(modelid);
-            if (it != pedVars.weatherSandstorm.end() && !it->second.empty())
-                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
-        }
+        if (weatherState.isSandstorm && !properties->weatherSandstorm.empty())
+            vectorfilterVector(properties->currentVariations, properties->weatherSandstorm);
 
-        if (weatherState.isFoggy)
-        {
-            auto it = pedVars.weatherFoggy.find(modelid);
-            if (it != pedVars.weatherFoggy.end() && !it->second.empty())
-                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
-        }
+        if (weatherState.isFoggy && !properties->weatherFoggy.empty())
+            vectorfilterVector(properties->currentVariations, properties->weatherFoggy);
 
-        if (weatherState.isWindy)
-        {
-            auto it = pedVars.weatherWindy.find(modelid);
-            if (it != pedVars.weatherWindy.end() && !it->second.empty())
-                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
-        }
+        if (weatherState.isWindy && !properties->weatherWindy.empty())
+            vectorfilterVector(properties->currentVariations, properties->weatherWindy);
 
-        if (weatherState.isSunny)
-        {
-            auto it = pedVars.weatherSunny.find(modelid);
-            if (it != pedVars.weatherSunny.end() && !it->second.empty())
-                vectorfilterVector(pedVars.currentVariations[modelid], it->second);
-        }
+        if (weatherState.isSunny && !properties->weatherSunny.empty())
+            vectorfilterVector(properties->currentVariations, properties->weatherSunny);
 
-        if (auto it = pedVars.activeTimeGroups.find(modelid); it != pedVars.activeTimeGroups.end())
-            for (auto i : it->second)
-                vectorfilterVector(pedVars.currentVariations[modelid], pedVars.timeGroups[modelid][i].variations);
+        for (auto i : properties->activeTimeGroups)
+            vectorfilterVector(properties->currentVariations, properties->timeGroups[i].variations);
 
-        if (auto it = pedVars.missionVariations.find(modelid); it != pedVars.missionVariations.end())
+        if (!properties->missionVariations.empty())
         {
             if (!CTheScripts__IsPlayerOnAMission())
             {
-                if (auto it2 = it->second.find("MISSIONGAMEPLAY"); it2 != it->second.end())
-                    vectorfilterVector(pedVars.currentVariations[modelid], it2->second);
+                if (auto it = properties->missionVariations.find("MISSIONGAMEPLAY"); it != properties->missionVariations.end())
+                    vectorfilterVector(properties->currentVariations, it->second);
             }
-            else if (auto it2 = it->second.find(currentMission); it2 != it->second.end())
-                vectorfilterVector(pedVars.currentVariations[modelid], it2->second);
-            else if (auto it3 = it->second.find("MISSIONALL"); it3 != it->second.end())
-                vectorfilterVector(pedVars.currentVariations[modelid], it3->second);
+            else if (auto it = properties->missionVariations.find(currentMission); it != properties->missionVariations.end())
+                vectorfilterVector(properties->currentVariations, it->second);
+            else if (auto it2 = properties->missionVariations.find("MISSIONALL"); it2 != properties->missionVariations.end())
+                vectorfilterVector(properties->currentVariations, it2->second);
         }
     }
 }
@@ -641,7 +636,7 @@ void PedVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
                                                                            "PED_TYPE_GANG3", "PED_TYPE_GANG4", "PED_TYPE_GANG5", "PED_TYPE_GANG6", "PED_TYPE_GANG7",
                                                                            "PED_TYPE_GANG8", "PED_TYPE_GANG9", "PED_TYPE_GANG10", "PED_TYPE_DEALER", "PED_TYPE_MEDIC",
                                                                            "PED_TYPE_FIREMAN", "PED_TYPE_CRIMINAL", "PED_TYPE_BUM", "PED_TYPE_PROSTITUTE", "PED_TYPE_SPECIAL",
-                                                                           "PED_TYPE_MISSION1", "PED_TYPE_MISSION2", "PED_TYPE_MISSION3", "PED_TYPE_MISSION4", 
+                                                                           "PED_TYPE_MISSION1", "PED_TYPE_MISSION2", "PED_TYPE_MISSION3", "PED_TYPE_MISSION4",
                                                                            "PED_TYPE_MISSION5", "PED_TYPE_MISSION6", "PED_TYPE_MISSION7", "PED_TYPE_MISSION8"};
 
             if (ped->m_nPedType >= PED_TYPE_PLAYER1 && ped->m_nPedType <= PED_TYPE_MISSION8)
@@ -681,10 +676,10 @@ void PedVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
             CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
             currentOffset += lineOffset;
         }
-       
-        if (auto it = pedVars.originalModels.find(ped->m_nModelIndex); (debugOptions & std::to_underlying(debugDrawPedStats::MODEL)) && it != pedVars.originalModels.end())
+
+        if (const auto* properties = findPedProperties(ped->m_nModelIndex); (debugOptions & std::to_underlying(debugDrawPedStats::MODEL)) && properties && properties->originalModel > 0)
         {
-            std::string line = "Parent model: " + std::to_string(it->second);
+            std::string line = "Parent model: " + std::to_string(properties->originalModel);
             CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
             currentOffset += lineOffset;
         }
@@ -707,21 +702,29 @@ void PedVariations::LogCurrentVariations()
     if (!Log::Write("pedCurrentVariations"))
         return;
 
-    if (pedVars.currentVariations.empty())
+    bool hasCurrentVariations = false;
+    for (auto modelId : pedVars.populatedModels)
+        if (const auto* properties = findPedProperties(modelId); properties && !properties->currentVariations.empty())
+        {
+            hasCurrentVariations = true;
+            break;
+        }
+
+    if (!hasCurrentVariations)
         Log::Write(" is empty\n");
     else
         Log::Write("\n");
 
-    for (auto it : pedVars.currentVariations)
-        if (!it.second.empty())
+    for (auto modelId : pedVars.populatedModels)
+        if (const auto* properties = findPedProperties(modelId); properties && !properties->currentVariations.empty())
         {
-            Log::Write("%d: ", it.first);
-            for (auto j : it.second)
+            Log::Write("%u: ", modelId);
+            for (auto variation : properties->currentVariations)
             {
                 const char* suffix = " ";
-                if (addedIDs.contains(j))
+                if (addedIDs.contains(variation))
                     suffix = "SP ";
-                Log::Write("%u%s", j, suffix);
+                Log::Write("%u%s", variation, suffix);
             }
             Log::Write("\n");
         }
@@ -783,13 +786,16 @@ __declspec(noinline) void __fastcall SetModelIndexHooked(CEntity* _this, void*, 
 {
     const auto originalCall = captureCurrentOriginalCall();
 
-    if (index < 7 || index > 65535 || (vectorHasId(pedVars.disableOnMission, index) && CTheScripts__IsPlayerOnAMission()))
+    if (index < 7 || index > 65535)
         return originalCall.callMethod(_this, index);
 
-    auto it = pedVars.currentVariations.find((unsigned short)index);
-    if (isValidPedId(index) && it != pedVars.currentVariations.end() && !it->second.empty())
+    auto* properties = findPedProperties(static_cast<unsigned short>(index));
+    if (properties && properties->disableOnMission && CTheScripts__IsPlayerOnAMission())
+        return originalCall.callMethod(_this, index);
+
+    if (properties && isValidPedId(index) && !properties->currentVariations.empty())
     {
-        const unsigned short newModel = vectorGetRandom(it->second);
+        const unsigned short newModel = vectorGetRandom(properties->currentVariations);
         if (newModel > 0 && newModel != index)
         {
             if (auto loadState = loadModel(newModel, PRIORITY_REQUEST, true); loadState != LOADSTATE_LOADED)
@@ -797,12 +803,12 @@ __declspec(noinline) void __fastcall SetModelIndexHooked(CEntity* _this, void*, 
                 Log::Write("Error loading ped model %d (%s) %s. Using original model %d.\n", newModel, modelNames.contains(newModel) ? modelNames[newModel].c_str() : "", getLoadStateString(loadState), index);
                 return originalCall.callMethod(_this, index);
             }
-                    
+
             originalCall.callMethod(_this, newModel);
 
             Log::WriteVerbose("Ped 0x%08X index %d was replaced with model %u\n", reinterpret_cast<uint32_t>(_this), index, newModel);
 
-            if (!vectorHasId(pedVars.dontInheritBehaviourModels, index))
+            if (!properties->dontInheritBehaviour)
                 _this->m_nModelIndex = (unsigned short)index;
             variationModel = newModel;
             return;
@@ -817,8 +823,9 @@ __declspec(noinline) void __fastcall UpdateRpHAnimHooked(CPed* entity)
     const auto originalCall = captureCurrentOriginalCall();
     originalCall.callMethod(entity);
 
-    if (auto it = pedVars.animGroups.find(variationModel > 0 ? variationModel : entity->m_nModelIndex); it != pedVars.animGroups.end())
-        entity->m_nAnimGroup = it->second;
+    const unsigned short modelId = variationModel > 0 ? variationModel : entity->m_nModelIndex;
+    if (const auto* properties = findPedProperties(modelId); properties && properties->animGroup.has_value())
+        entity->m_nAnimGroup = *properties->animGroup;
 
     if (variationModel > 0)
         entity->m_nModelIndex = variationModel;
@@ -834,23 +841,14 @@ __declspec(noinline) char __fastcall CAEPedSpeechAudioEntity__InitialiseHooked(C
         const auto currentModel = ped->m_nModelIndex;
         unsigned short newModel = 0;
 
-        bool useParentVoice = false;
+        const auto* properties = findPedProperties(ped->m_nModelIndex);
+        const bool useParentVoice = properties && properties->useParentVoice.has_value() ? *properties->useParentVoice : pedOptions.useParentVoices;
 
-        if (auto it = pedVars.useParentVoice.find(ped->m_nModelIndex); it != pedVars.useParentVoice.end())
-            useParentVoice = it->second;
-        else
-            useParentVoice = pedOptions.useParentVoices;
+        if (useParentVoice && properties)
+            newModel = properties->originalModel;
 
-        if (useParentVoice)
-        {
-            auto it = pedVars.originalModels.find(ped->m_nModelIndex);
-            if (it != pedVars.originalModels.end())
-                newModel = it->second;
-        }
-
-        auto it = pedVars.voices.find(ped->m_nModelIndex);
-        if (it != pedVars.voices.end() && !it->second.empty())
-            newModel = vectorGetRandom(it->second);
+        if (properties && !properties->voices.empty())
+            newModel = vectorGetRandom(properties->voices);
 
         if (newModel > 0)
         {
@@ -939,12 +937,12 @@ __declspec(noinline) int __cdecl ChooseCivilianOccupationForVehicleHooked(char m
 {
     const auto originalCall = captureCurrentOriginalCall();
 
-    auto vehDrivers = { 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34, 
-                        35, 36, 37, 40, 43, 44, 45, 46, 47, 48, 50, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69, 71, 72, 73, 
-                        82, 83, 84, 90, 91, 93, 94, 95, 97, 98, 100, 101, 128, 131, 132, 133, 134, 135, 136, 137, 138, 
-                        139, 140, 141, 142, 143, 147, 148, 150, 151, 153, 154, 157, 158, 159, 160, 161, 162, 168, 169, 
-                        170, 181, 182, 183, 184, 185, 186, 187, 188, 198, 199, 200, 201, 202, 206, 210, 211, 212, 213, 
-                        215, 216, 217, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 233, 234, 235, 236, 240, 
+    auto vehDrivers = { 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34,
+                        35, 36, 37, 40, 43, 44, 45, 46, 47, 48, 50, 55, 56, 57, 58, 59, 60, 66, 67, 68, 69, 71, 72, 73,
+                        82, 83, 84, 90, 91, 93, 94, 95, 97, 98, 100, 101, 128, 131, 132, 133, 134, 135, 136, 137, 138,
+                        139, 140, 141, 142, 143, 147, 148, 150, 151, 153, 154, 157, 158, 159, 160, 161, 162, 168, 169,
+                        170, 181, 182, 183, 184, 185, 186, 187, 188, 198, 199, 200, 201, 202, 206, 210, 211, 212, 213,
+                        215, 216, 217, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 233, 234, 235, 236, 240,
                         241, 242, 247, 248, 250, 255, 260, 261, 262, 263 };
 
 
@@ -982,7 +980,7 @@ __declspec(noinline) int __cdecl ChooseCivilianOccupationForVehicleHooked(char m
             }
         }
     }
-   
+
     std::pair<unsigned short, unsigned short> leastUsedModel = { 7, 65535 };
 
     for (auto i : vehDrivers)

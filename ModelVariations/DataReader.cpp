@@ -13,8 +13,7 @@ namespace
 	std::string_view cleanLine(std::string_view line)
 	{
 		for (std::size_t i = 0; i < line.size(); ++i)
-			if (line[i] == ';' || line[i] == '#' ||
-				(line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/'))
+			if (line[i] == ';' || line[i] == '#' ||	(line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/'))
 			{
 				line.remove_suffix(line.size() - i);
 				break;
