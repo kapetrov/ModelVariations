@@ -116,6 +116,7 @@
     <ClCompile Include="Memory.cpp" />
     <ClCompile Include="Peds.cpp" />
     <ClCompile Include="PedWeapons.cpp" />
+    <ClCompile Include="VariationData.cpp" />
     <ClCompile Include="Vehicles.cpp" />
     <ClCompile Include="ModelVariations.cpp" />
   </ItemGroup>
@@ -129,6 +130,7 @@
     <ClInclude Include="Peds.hpp" />
     <ClInclude Include="PedWeapons.hpp" />
     <ClInclude Include="SA.hpp" />
+    <ClInclude Include="VariationData.hpp" />
     <ClInclude Include="Vehicles.hpp" />
   </ItemGroup>
   <ItemGroup>

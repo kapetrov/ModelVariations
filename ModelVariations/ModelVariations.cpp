@@ -5,6 +5,7 @@
 #include "Log.hpp"
 #include "Memory.hpp"
 #include "SA.hpp"
+#include "VariationData.hpp"
 
 #include "Peds.hpp"
 #include "PedWeapons.hpp"
@@ -190,6 +191,9 @@ void clearEverything()
 {
     iniSettings.Clear();
 
+    resetOriginalModels();
+    variations.clear();
+
     PedVariations::ClearData();
     PedWeaponVariations::ClearData();
     VehicleVariations::ClearData();
@@ -249,6 +253,8 @@ void loadIniData()
 void updateVariations()
 {
     //zInfo->m_szTextKey = BLUEB | zInfo->m_szLabel = BLUEB1
+
+    currentZoneVariations = variations.find(*reinterpret_cast<uint64_t*>(currentZone));
 
     auto player = FindPlayerPed();
             

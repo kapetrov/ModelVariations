@@ -48,6 +48,4 @@ public:
 
 	//Call hooks
 	static void InstallHooks(bool enableSpecialPeds);
-
-	static unsigned short GetVariationOriginalModel(const int modelIndex);
 };

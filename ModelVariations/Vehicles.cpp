@@ -5,6 +5,7 @@
 #include "Log.hpp"
 #include "Memory.hpp"
 #include "SA.hpp"
+#include "VariationData.hpp"
 
 #include <plugin.h>
 #include <CCarCtrl.h>
@@ -152,10 +153,6 @@ struct tVehVars {
     std::array<std::unique_ptr<vehVariationProperties>, 65536> vehById{};
     std::vector<unsigned short> populatedModels;
 
-    std::array<unsigned short, 65536> originalModels{};
-
-    std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
-
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> occupantGroups;
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> trailerZones;
     std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> tuning;
@@ -200,27 +197,6 @@ struct tVehOptions {
 
 static tVehOptions vehOptions;
 
-
-static __declspec(naked) int __stdcall getVariationOriginalModel(int)
-{
-    __asm
-    {
-        push    ecx
-
-        mov     eax, [esp + 8] 
-        mov     ecx, eax
-        bswap   ecx
-        jcxz    in_range
-
-        pop     ecx
-        ret     4
-
-in_range:
-        movzx   eax, word ptr[vehVars.originalModels + eax * 2]
-        pop     ecx
-        ret     4
-    }
-}
 
 float getDistanceFromVeh(CVehicle* vehicle, CEntity* target)
 {
@@ -512,9 +488,7 @@ void processTuning(CVehicle* veh)
             else
                 slotsSelected[i] = rand<uint32_t>(0, 3) == 0;
 
-        const std::string section = properties && !properties->vehName.empty()
-            ? properties->vehName
-            : std::to_string(veh->m_nModelIndex);
+        const std::string section = properties && !properties->vehName.empty() ? properties->vehName : std::to_string(veh->m_nModelIndex);
 
         if (dataFile.ReadBoolean(section, "TuningFullBodykit", false))
             if (slotsSelected[14] == true || slotsSelected[15] == true || slotsSelected[3] == true)
@@ -625,7 +599,6 @@ void VehicleVariations::ClearData()
         vehVars.vehById[modelId].reset();
     vehVars.populatedModels.clear();
 
-    vehVars.variations.clear();
     vehVars.occupantGroups.clear();
     vehVars.trailerZones.clear();
     vehVars.currentTuning = nullptr;
@@ -635,9 +608,6 @@ void VehicleVariations::ClearData()
     vehVars.stack.clear();
 
     vehOptions = {};
-
-    for (std::size_t i = 0; i < vehVars.originalModels.size(); ++i)
-        vehVars.originalModels[i] = static_cast<unsigned short>(i);
 
     dataFile.Clear();
 }
@@ -697,12 +667,12 @@ void VehicleVariations::LoadData()
                             {
                                 CZone* zone = reinterpret_cast<CZone*>(CTheZones__NavigationZoneArray + k * 0x20);
                                 uint64_t zoneName = *reinterpret_cast<uint64_t*>(zone->m_szLabel);
-                                vehVars.variations[zoneName][modelid] = vectorUnion(vehVars.variations[zoneName][modelid], vec);
+                                variations[zoneName][modelid] = vectorUnion(variations[zoneName][modelid], vec);
                             }
                         else for (auto zone : it->second)
                         {
                             uint64_t zoneName = *reinterpret_cast<uint64_t*>(zone->m_szLabel);
-                            vehVars.variations[zoneName][modelid] = vectorUnion(vehVars.variations[zoneName][modelid], vec);
+                            variations[zoneName][modelid] = vectorUnion(variations[zoneName][modelid], vec);
                         }
                     }
 
@@ -785,7 +755,7 @@ void VehicleVariations::LoadData()
                     if (!vec.empty())
                     {
                         properties.hasVariations = true;
-                        vehVars.variations[zoneName][modelid] = mergeZones ? vectorUnion(vehVars.variations[zoneName][modelid], vec) : vec;
+                        variations[zoneName][modelid] = mergeZones ? vectorUnion(variations[zoneName][modelid], vec) : vec;
                     }
 
                     //Groups
@@ -813,11 +783,11 @@ void VehicleVariations::LoadData()
                 properties.wantedVariations[i] = vec;
             }
 
-            for (auto &i : vehVars.variations)
+            for (auto &i : variations)
                 if (auto it = i.second.find(modelid); it != i.second.end())
                     for (auto variation : it->second)
                         if (variation > 0 && variation != modelid && !(vectorHasId(vehOptions.inheritExclude, variation)))
-                            vehVars.originalModels[variation] = modelid;
+                            setOriginalModel(variation, modelid);
 
 
             const int tuningChance = dataFile.ReadInteger(section, "TuningChance", -1);
@@ -953,7 +923,7 @@ void VehicleVariations::LoadData()
 
             vec = dataFile.ReadLine(section, "ParentModel", READ_VEHICLES);
             if (!vec.empty() && vec[0] >= 400)
-                vehVars.originalModels[modelid] = vec[0];
+                setOriginalModel(modelid, vec[0]);
 
             vec = dataFile.ReadLine(section, "TrailersMatchExtras", READ_NUMS);
             if (!vec.empty())
@@ -979,9 +949,9 @@ void VehicleVariations::LoadData()
 
     std::sort(vehVars.populatedModels.begin(), vehVars.populatedModels.end());
 
-    for (int i = 0; i < 65536; i++)
-        if (vehVars.originalModels[i] == 0)
-            vehVars.originalModels[i] = static_cast<unsigned short>(i);
+    for (int i = 1; i < 65536; i++)
+        if (getVariationOriginalModel(i) == 0)
+            setOriginalModel(i, i);
 
     Log::Write("\n");
 }
@@ -990,33 +960,38 @@ void VehicleVariations::Process()
 {
     int variationsUpdateQueued = 0;
 
+    static int lastGameTime = -1;
     int gameTime = (CClock__ms_nGameClockHours * 100 + CClock__ms_nGameClockMinutes);
 
-    for (auto modelId : vehVars.populatedModels)
-        if (auto* properties = findVehProperties(modelId))
-            for (auto it = properties->activeTimeGroups.begin(); it != properties->activeTimeGroups.end();)
-            {
-                auto index = *it;
-
-                if (!isTimeInRange(gameTime, properties->timeGroups[index].start, properties->timeGroups[index].end))
+    if (gameTime != lastGameTime)
+    {
+        lastGameTime = gameTime;
+        for (auto modelId : vehVars.populatedModels)
+            if (auto* properties = findVehProperties(modelId))
+                for (auto it = properties->activeTimeGroups.begin(); it != properties->activeTimeGroups.end();)
                 {
-                    it = properties->activeTimeGroups.erase(it);
-                    variationsUpdateQueued = modelId;
-                }
-                else
-                {
-                    ++it;
-                }
-            }
+                    auto index = *it;
 
-    for (auto modelId : vehVars.populatedModels)
-        if (auto* properties = findVehProperties(modelId))
-            for (unsigned int i = 0; i < properties->timeGroups.size(); i++)
-            {
-                if (isTimeInRange(gameTime, properties->timeGroups[i].start, properties->timeGroups[i].end))
-                    if (properties->activeTimeGroups.insert((unsigned short)i).second == true)
+                    if (!isTimeInRange(gameTime, properties->timeGroups[index].start, properties->timeGroups[index].end))
+                    {
+                        it = properties->activeTimeGroups.erase(it);
                         variationsUpdateQueued = modelId;
-            }
+                    }
+                    else
+                    {
+                        ++it;
+                    }
+                }
+
+        for (auto modelId : vehVars.populatedModels)
+            if (auto* properties = findVehProperties(modelId))
+                for (unsigned int i = 0; i < properties->timeGroups.size(); i++)
+                {
+                    if (isTimeInRange(gameTime, properties->timeGroups[i].start, properties->timeGroups[i].end))
+                        if (properties->activeTimeGroups.insert((unsigned short)i).second == true)
+                            variationsUpdateQueued = modelId;
+                }
+    }
 
     if (variationsUpdateQueued > 0)
     {
@@ -1281,12 +1256,11 @@ void VehicleVariations::UpdateVariations()
             properties->currentVariations.clear();
 
     auto currentZoneTuning = vehVars.tuning.find(*reinterpret_cast<uint64_t*>(currentZone));
-    auto currentZoneVariations = vehVars.variations.find(*reinterpret_cast<uint64_t*>(currentZone));
 
     if (currentZoneTuning != vehVars.tuning.end())
         vehVars.currentTuning = &(currentZoneTuning->second);
 
-    if (currentZoneVariations == vehVars.variations.end())
+    if (currentZoneVariations == variations.end())
         return;
 
     for (auto modelid : vehVars.populatedModels)
@@ -1481,12 +1455,16 @@ void VehicleVariations::LogVariations()
         return;
 
     std::map<unsigned short, std::set<unsigned short>> variationsMap;
-    for (auto& it : vehVars.variations)
-    {
-        for (auto &i : it.second)
+    for (auto& it : variations)
+        for (auto& i : it.second)
+        {
+            auto mInfo = CModelInfo::GetModelInfo(i.first);
+            if (!mInfo || mInfo->GetModelType() != MODEL_INFO_VEHICLE)
+                continue;
+
             for (auto j : i.second)
                 variationsMap[i.first].insert(j);
-    }
+        }
     
     for (auto& i : variationsMap)
     {

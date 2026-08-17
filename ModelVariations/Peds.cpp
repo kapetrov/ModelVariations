@@ -6,6 +6,7 @@
 #include "Log.hpp"
 #include "Memory.hpp"
 #include "SA.hpp"
+#include "VariationData.hpp"
 
 #include <plugin.h>
 #include <ePedType.h>
@@ -32,7 +33,6 @@ std::vector<int16_t> destroyedModelCounters;
 
 struct pedVariationProperties {
     std::optional<unsigned int> animGroup;
-    unsigned short originalModel = 0;
 
     std::array<std::vector<unsigned short>, 6> wantedVariations;
     std::unordered_map<std::string, std::vector<unsigned short>> missionVariations;
@@ -59,8 +59,6 @@ struct pedVariationProperties {
 struct tPedVars {
     std::array<std::unique_ptr<pedVariationProperties>, 65536> pedById{};
     std::vector<unsigned short> populatedModels;
-
-    std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
 
     std::vector<CPed*> stack;
 };
@@ -117,16 +115,6 @@ bool isValidPedId(int id)
     return true;
 }
 
-unsigned short PedVariations::GetVariationOriginalModel(const int modelIndex)
-{
-    const auto id = static_cast<unsigned short>(modelIndex);
-    const auto* properties = findPedProperties(id);
-    if (properties && properties->originalModel > 0)
-        return properties->originalModel;
-
-    return id;
-}
-
 bool isPedVisible(CPed* ped)
 {
     if (ped == NULL)
@@ -176,7 +164,6 @@ void PedVariations::ClearData()
         pedVars.pedById[modelId].reset();
     pedVars.populatedModels.clear();
 
-    pedVars.variations.clear();
     pedVars.stack.clear();
 
     pedOptions = {};
@@ -224,13 +211,13 @@ void PedVariations::LoadData()
                             {
                                 CZone* zone = reinterpret_cast<CZone*>(CTheZones__NavigationZoneArray + k * 0x20);
                                 uint64_t zoneName = *reinterpret_cast<uint64_t*>(zone->m_szLabel);
-                                pedVars.variations[zoneName][modelIndex] = vectorUnion(pedVars.variations[zoneName][modelIndex], vec);
+                                variations[zoneName][modelIndex] = vectorUnion(variations[zoneName][modelIndex], vec);
                             }
                         }
                         else for (auto zone : it->second)
                         {
                             uint64_t zoneName = *reinterpret_cast<uint64_t*>(zone->m_szLabel);
-                            pedVars.variations[zoneName][modelIndex] = vectorUnion(pedVars.variations[zoneName][modelIndex], vec);
+                            variations[zoneName][modelIndex] = vectorUnion(variations[zoneName][modelIndex], vec);
                         }
                     }
                 }
@@ -255,7 +242,7 @@ void PedVariations::LoadData()
                         properties.hasVariations = true;
                         uint64_t zoneName = 0;
                         copyString((char*)&zoneName, kvp.first.data(), std::min<std::size_t>(8, kvp.first.size()));
-                        pedVars.variations[zoneName][modelIndex] = mergeZones ? vectorUnion(pedVars.variations[zoneName][modelIndex], vec) : vec;
+                        variations[zoneName][modelIndex] = mergeZones ? vectorUnion(variations[zoneName][modelIndex], vec) : vec;
                     }
                 }
             }
@@ -268,15 +255,11 @@ void PedVariations::LoadData()
                 properties.wantedVariations[j] = vec;
             }
 
-            for (const auto& j : pedVars.variations)
+            for (const auto& j : variations)
                 if (auto it = j.second.find(modelIndex); it != j.second.end())
                     for (auto variation : it->second)
                         if (variation > 0 && variation != modelIndex)
-                        {
-                            auto& variationProperties = getOrCreatePedProperties(variation);
-                            if (variationProperties.originalModel == 0)
-                                variationProperties.originalModel = modelIndex;
-                        }
+                            setOriginalModel(variation, modelIndex);
 
             for (unsigned int j = 0; j < 9; j++)
             {
@@ -475,8 +458,8 @@ void PedVariations::ProcessDrugDealers(bool reset)
             Log::Write("Applying drug dealer fix...\n");
 
             for (auto modelId : pedVars.populatedModels)
-                if (const auto* properties = findPedProperties(modelId); properties && modelId > 300)
-                    if (properties->originalModel == 28 || properties->originalModel == 29 || properties->originalModel == 30 || properties->originalModel == 254)
+                if (modelId > 300)
+                    if (auto originalModel = getVariationOriginalModel(modelId); originalModel == 28 || originalModel == 29 || originalModel == 30 || originalModel == 254)
                     {
                         Log::Write(addedIDs.contains(modelId) ? "%uSP\n" : "%u\n", modelId);
                         auto findByScmIndex = CExternalScripts__findByScmIndex(CTheScripts__StreamedScripts, 19);
@@ -500,8 +483,7 @@ void PedVariations::UpdateVariations()
             properties->currentVariations.clear();
 
     auto player = FindPlayerPed();
-    auto interiorVariations = (player->m_pEnex) ? pedVars.variations.find(*reinterpret_cast<const uint64_t*>(player->m_pEnex)) : pedVars.variations.end();
-    auto zoneVariations = pedVars.variations.find(*reinterpret_cast<uint64_t*>(currentZone));
+    auto interiorVariations = (player->m_pEnex) ? variations.find(*reinterpret_cast<const uint64_t*>(player->m_pEnex)) : variations.end();
 
     for (auto modelId : pedVars.populatedModels)
     {
@@ -511,15 +493,15 @@ void PedVariations::UpdateVariations()
 
         bool modelHasInteriorVariations = false;
 
-        if (interiorVariations != pedVars.variations.end())
+        if (interiorVariations != variations.end())
             if (auto it = interiorVariations->second.find(modelId); it != interiorVariations->second.end())
             {
                 properties->currentVariations = it->second;
                 modelHasInteriorVariations = true;
             }
 
-        if ((!modelHasInteriorVariations || properties->mergeInteriors) && zoneVariations != pedVars.variations.end())
-            if (auto it = zoneVariations->second.find(modelId); it != zoneVariations->second.end())
+        if ((!modelHasInteriorVariations || properties->mergeInteriors) && currentZoneVariations != variations.end())
+            if (auto it = currentZoneVariations->second.find(modelId); it != currentZoneVariations->second.end())
                 properties->currentVariations = vectorUnion(it->second, properties->currentVariations);
 
         if (wantedLevel < 6 && !properties->wantedVariations[wantedLevel].empty() && !properties->currentVariations.empty())
@@ -677,9 +659,10 @@ void PedVariations::DrawDebugInfo(float fontSize, uint32_t debugOptions)
             currentOffset += lineOffset;
         }
 
-        if (const auto* properties = findPedProperties(ped->m_nModelIndex); (debugOptions & std::to_underlying(debugDrawPedStats::MODEL)) && properties && properties->originalModel > 0)
+        const auto originalModel = getVariationOriginalModel(ped->m_nModelIndex);
+        if ((debugOptions & std::to_underlying(debugDrawPedStats::MODEL)) && originalModel != ped->m_nModelIndex)
         {
-            std::string line = "Parent model: " + std::to_string(properties->originalModel);
+            std::string line = "Parent model: " + std::to_string(originalModel);
             CFont::PrintString(screenPos.x, screenPos.y + currentOffset, line.c_str());
             currentOffset += lineOffset;
         }
@@ -747,12 +730,16 @@ void PedVariations::LogVariations()
         return;
 
     std::map<unsigned short, std::set<unsigned short>> variationsMap;
-    for (const auto& it : pedVars.variations)
-    {
-        for (const auto &i : it.second)
+    for (const auto& it : variations)
+        for (const auto& i : it.second)
+        {
+            auto mInfo = CModelInfo::GetModelInfo(i.first);
+            if (!mInfo || mInfo->GetModelType() != MODEL_INFO_PED)
+                continue;
+
             for (auto j : i.second)
                 variationsMap[i.first].insert(j);
-    }
+        }
 
     for (const auto& i : variationsMap)
     {
@@ -844,8 +831,8 @@ __declspec(noinline) char __fastcall CAEPedSpeechAudioEntity__InitialiseHooked(C
         const auto* properties = findPedProperties(ped->m_nModelIndex);
         const bool useParentVoice = properties && properties->useParentVoice.has_value() ? *properties->useParentVoice : pedOptions.useParentVoices;
 
-        if (useParentVoice && properties)
-            newModel = properties->originalModel;
+        if (useParentVoice)
+            newModel = static_cast<unsigned short>(getVariationOriginalModel(ped->m_nModelIndex));
 
         if (properties && !properties->voices.empty())
             newModel = vectorGetRandom(properties->voices);

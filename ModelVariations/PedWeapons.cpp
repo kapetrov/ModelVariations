@@ -5,6 +5,7 @@
 #include "Peds.hpp"
 #include "PedWeapons.hpp"
 #include "SA.hpp"
+#include "VariationData.hpp"
 
 #include <plugin.h>
 #include <CModelInfo.h>
@@ -40,7 +41,7 @@ static tPedWeaponOptions pedWeaponOptions;
 
 bool isIdValidForWatcher(unsigned short id)
 {
-    switch (PedVariations::GetVariationOriginalModel(id))  //NOTE: drug dealers only work with WEAPONFORCE because they are initially unarmed
+    switch (getVariationOriginalModel(id))  //NOTE: drug dealers only work with WEAPONFORCE because they are initially unarmed
     {
         case 28:
         case 29:
