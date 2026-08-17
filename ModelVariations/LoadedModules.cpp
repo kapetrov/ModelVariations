@@ -3,8 +3,10 @@
 #include "Helpers.hpp"
 #include "Log.hpp"
 
+#include <array>
 #include <map>
 
+#include <bcrypt.h>
 #include <ntstatus.h>
 
 std::array<bool, 2> loadedMods;

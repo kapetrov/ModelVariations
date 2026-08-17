@@ -184,7 +184,14 @@ void* hookCallImpl(std::uintptr_t address, void* pFunction, const char* name, bo
     if (isVTableAddress)
     {
         originalAddress = *reinterpret_cast<void**>(address);
-        *reinterpret_cast<void**>(address) = pFunction;
+
+        if (!isAddressValid(originalAddress)) //We assume 'address' is valid since we provided it
+        {
+            Log::Write("Invalid vtable entry: 0x%08X is %s\n", address, bytesToString(address, 4).c_str());
+            return nullptr;
+        }
+
+        injector::WriteMemory(address, pFunction, true);
     }
     else
     {

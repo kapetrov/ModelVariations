@@ -193,6 +193,7 @@ void clearEverything()
 
     resetOriginalModels();
     variations.clear();
+    currentZoneVariations = variations.end();
 
     PedVariations::ClearData();
     PedWeaponVariations::ClearData();
