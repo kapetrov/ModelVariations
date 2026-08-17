@@ -230,14 +230,15 @@ void PedWeaponVariations::Process()
                 weaponStrings[i] = "WEAPON" + std::to_string(ped->m_aWeapons[i].m_eWeaponType);
 
         const int originalSlot = ped->m_nSelectedWepSlot;
-        char zoneString[9] = {};
-        *reinterpret_cast<uint64_t*>(zoneString) = *reinterpret_cast<uint64_t*>(currentZone);
         auto player = FindPlayerPed();
         const CWanted* wanted = FindPlayerWanted(-1);
         unsigned int wantedLevel = wanted ? wanted->m_nWantedLevel : 0;
 
-        if (player->m_pEnex)
+        char zoneString[9] = {};
+        if (player && player->m_pEnex)
             copyString(zoneString, reinterpret_cast<char*>(player->m_pEnex), 8);
+        else
+            *reinterpret_cast<uint64_t*>(zoneString) = *reinterpret_cast<uint64_t*>(currentZone);
 
         const std::string missionString = (isOnMission) ? ("MISSION_" + std::string(currentMission) + "|") : "";
         const std::string wantedString = (wantedLevel > 0) ? ("WANTED" + std::to_string(wantedLevel) + "|") : "";
