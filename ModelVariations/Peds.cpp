@@ -28,7 +28,6 @@
 #include <set>
 
 static const char* dataFileName = "ModelVariations_Peds.ini";
-static DataReader dataFile;
 std::vector<int16_t> destroyedModelCounters;
 
 struct pedVariationProperties {
@@ -167,13 +166,11 @@ void PedVariations::ClearData()
     pedVars.stack.clear();
 
     pedOptions = {};
-
-    dataFile.Clear();
 }
 
 void PedVariations::LoadData()
 {
-    dataFile.Load(dataFileName);
+    DataReader dataFile(dataFileName);
 
     Log::Write("\nReading ped data...\n");
 

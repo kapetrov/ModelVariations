@@ -102,7 +102,6 @@ namespace
 }
 
 static const char* dataFileName = "ModelVariations_Vehicles.ini";
-static DataReader dataFile;
 
 unsigned short roadblockModel = 0;
 unsigned short roadblockDriver = 0;
@@ -128,6 +127,9 @@ struct vehVariationProperties {
     bool changeOnlyWhenParked = false;
     bool useOnlyGroups = false;
     bool hasGroupWantedVariations = false;
+    bool tuningFullBodykit = false;
+    bool replaceDriver = false;
+    bool replacePassengers = false;
     std::vector<unsigned short> drivers;
     std::vector<unsigned short> passengers;
     std::vector<unsigned short> driverGroups[9];
@@ -140,7 +142,6 @@ struct vehVariationProperties {
     std::optional<RwRGBA> lightColors2;
     std::optional<float> lightSizes;
     std::vector<unsigned short> tuningDriverIds;
-    std::string vehName;
     std::optional<BYTE> tuningChances;
     std::optional<BYTE> trailersSpawnChances;
     std::optional<short> trailersHealth;
@@ -488,9 +489,7 @@ void processTuning(CVehicle* veh)
             else
                 slotsSelected[i] = rand<uint32_t>(0, 3) == 0;
 
-        const std::string section = properties && !properties->vehName.empty() ? properties->vehName : std::to_string(veh->m_nModelIndex);
-
-        if (dataFile.ReadBoolean(section, "TuningFullBodykit", false))
+        if (properties && properties->tuningFullBodykit)
             if (slotsSelected[14] == true || slotsSelected[15] == true || slotsSelected[3] == true)
                 slotsSelected[14] = slotsSelected[15] = slotsSelected[3] = true;
 
@@ -608,13 +607,11 @@ void VehicleVariations::ClearData()
     vehVars.stack.clear();
 
     vehOptions = {};
-
-    dataFile.Clear();
 }
 
 void VehicleVariations::LoadData()
 {
-    dataFile.Load(dataFileName);
+    DataReader dataFile(dataFileName);
 
     vehOptions.changeCarGenerators   = dataFile.ReadBoolean("Settings", "ChangeCarGenerators", false);
     vehOptions.changeScriptedCars    = dataFile.ReadBoolean("Settings", "ChangeScriptedCars", false);
@@ -634,21 +631,15 @@ void VehicleVariations::LoadData()
         std::string section(iniData.first);
         Log::Write("%s\n", section.c_str());
         int iModel = 0;
-        bool hasModelName = false;
         if (section[0] >= '0' && section[0] <= '9')
              fromString<int>(section, iModel);
         else
-        {
             CModelInfo::GetModelInfo(section.data(), &iModel);
-            hasModelName = iModel >= 400;
-        }
 
         if (iModel >= 400 && iModel < 65535)
         {
             unsigned short modelid = (unsigned short)iModel;
             auto& properties = getOrCreateVehProperties(modelid);
-            if (hasModelName && properties.vehName.empty())
-                properties.vehName = section;
 
             if (dataFile.ReadBoolean(section, "ChangeOnlyParked", false))
                 properties.changeOnlyWhenParked = true;
@@ -944,12 +935,16 @@ void VehicleVariations::LoadData()
             const short trailersHealth = (short)dataFile.ReadInteger(section, "TrailersHealth", -1);
             if (trailersHealth > -1 && !properties.trailersHealth)
                 properties.trailersHealth = trailersHealth;
+
+            properties.tuningFullBodykit = dataFile.ReadBoolean(section, "TuningFullBodykit", false);
+            properties.replaceDriver = dataFile.ReadBoolean(section, "ReplaceDriver", false);
+            properties.replacePassengers = dataFile.ReadBoolean(section, "ReplacePassengers", false);
         }
     }
 
     std::sort(vehVars.populatedModels.begin(), vehVars.populatedModels.end());
 
-    for (int i = 1; i < 65536; i++)
+    for (int i = 0; i < 65536; i++)
         if (getVariationOriginalModel(i) == 0)
             setOriginalModel(i, i);
 
@@ -1851,11 +1846,10 @@ __declspec(noinline) CPed* __cdecl AddPedInCarHooked(CVehicle* veh, char driver,
         return NULL;
 
     const auto* vehicleProperties = findVehProperties(veh->m_nModelIndex);
-    const std::string section = vehicleProperties && !vehicleProperties->vehName.empty() ? vehicleProperties->vehName : std::to_string(veh->m_nModelIndex);
 
     if (driver)
     {
-        const bool replaceDriver = dataFile.ReadBoolean(section, "ReplaceDriver", false) ? true : rand<bool>();
+        const bool replaceDriver = vehicleProperties && vehicleProperties->replaceDriver ? true : rand<bool>();
         if (currentOccupantsGroup > -1 && currentOccupantsGroup < 9 && currentOccupantsModel > 0)
         {
             const auto* properties = findVehProperties(currentOccupantsModel);
@@ -1867,7 +1861,7 @@ __declspec(noinline) CPed* __cdecl AddPedInCarHooked(CVehicle* veh, char driver,
     }
     else
     {
-        const bool replacePassenger = dataFile.ReadBoolean(section, "ReplacePassengers", false) ? true : rand<bool>();
+        const bool replacePassenger = vehicleProperties && vehicleProperties->replacePassengers ? true : rand<bool>();
         if (currentOccupantsGroup > -1 && currentOccupantsGroup < 9 && currentOccupantsModel > 0)
         {
             const auto* properties = findVehProperties(currentOccupantsModel);

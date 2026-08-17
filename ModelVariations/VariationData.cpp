@@ -5,7 +5,6 @@ std::array<unsigned short, 65536> originalModels{};
 
 
 std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>> variations;
-
 std::unordered_map<uint64_t, std::unordered_map<unsigned short, std::vector<unsigned short>>>::iterator currentZoneVariations = variations.end();
 
 
