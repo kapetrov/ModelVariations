@@ -12,6 +12,7 @@
     <ClCompile Include="Memory.cpp" />
     <ClCompile Include="Helpers.cpp" />
     <ClCompile Include="VariationData.cpp" />
+    <ClCompile Include="Timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Vehicles.hpp" />
@@ -25,6 +26,7 @@
     <ClInclude Include="SA.hpp" />
     <ClInclude Include="Memory.hpp" />
     <ClInclude Include="VariationData.hpp" />
+    <ClInclude Include="Timer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ModelVariations.ruleset" />

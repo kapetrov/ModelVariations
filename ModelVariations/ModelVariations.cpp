@@ -5,6 +5,7 @@
 #include "Log.hpp"
 #include "Memory.hpp"
 #include "SA.hpp"
+#include "Timer.hpp"
 #include "VariationData.hpp"
 
 #include "Peds.hpp"
@@ -47,6 +48,8 @@ char(*InitialiseRenderWareOriginal)() = reinterpret_cast<char(*)()>(0x5BD600);
 
 std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 
+std::vector<Timer::TimerID> timers;
+bool restartTimers = false;
 
 std::set<unsigned short> referenceCountModels;
 std::set<unsigned short> addedIDsInGroups;
@@ -454,6 +457,8 @@ void refreshOnGameRestart()
             Log::Write("%u %s\n", it.first, it.second.c_str());
         Log::Write("\n");
     }
+
+    restartTimers = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -690,29 +695,19 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
         lastTime = std::chrono::steady_clock::time_point{};
 
     totalTimeSinceLoad = std::chrono::duration_cast<std::chrono::milliseconds>(now - loadTime);
-
-    if (lowMemoryProtection > 0)
-    {
-        int totalMemory = 0;
-
-        if (static int lastMemoryCheck = 0; (totalTimeSinceLoad.count() / 1000) != lastMemoryCheck)
-        {
-            lastMemoryCheck = static_cast<int>(totalTimeSinceLoad.count()) / 1000;
-            totalMemory = getMemoryUsage() / 1024 / 1024;
-        }
-
-        if (totalMemory > lowMemoryProtection && (enablePeds || enablePedWeapons || enableVehicles))
-        {
-            CMessages::AddMessageJumpQ("~y~Model Variations~s~: Mod disabled due to low memory. Reload manually.", 4000, 0, false);
-            reinterpret_cast<void (*)()>(0x40CF80)(); //CStreaming::RemoveAllUnusedModels
-            clearEverything();
-            enablePeds = false;
-            enablePedWeapons = false;
-            enableVehicles = false;
-        }
-    }
+    
 
     originalCall.call();
+
+    if (restartTimers)
+    {
+        for (auto timer : timers)
+            Timer::Start(timer, true);
+
+        restartTimers = false;
+    }
+
+    Timer::Process();
 
     if (logJumps && Log::Write("\nLogging JMP hooks...\n"))
     {
@@ -760,23 +755,6 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
         logJumps = false;
     }
 
-    if (trackReferenceCounts > 0 && CModelInfo::GetModelInfo(0))
-        for (int i = 7; i < std::max<int>(flaMaxID, 20000); i++)
-        {
-            auto mInfo = CModelInfo::GetModelInfo(i);
-            if (mInfo && mInfo->m_nRefCount > trackReferenceCounts && !referenceCountModels.contains(static_cast<unsigned short>(i)))
-            {
-                auto modelType = (mInfo->GetModelType() == MODEL_INFO_VEHICLE) ? "(Vehicle) " : ((mInfo->GetModelType() == MODEL_INFO_PED) ? "(Ped) " : "");
-
-                std::string warning_string = msprintf("WARNING: model %d %shas a reference count of %d\n", i, modelType, mInfo->m_nRefCount);
-                Log::Write("%s", warning_string.c_str());
-#ifdef _DEBUG
-                MessageBox(NULL, warning_string.c_str(), "Model Variations", MB_ICONWARNING);
-#endif
-                referenceCountModels.insert(static_cast<unsigned short>(i));
-            }
-        }
-
     if (newVersionFound && gameplayTimeSinceLoad.count() > 9999)
     {
         CMessages::AddMessageJumpQ("~y~Model Variations~s~: Update available.", 4000, 0, false);
@@ -821,72 +799,6 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
     else
         keyDown = false;
 
-    static int secSinceLastModuleCheck = -1;
-    int seconds = static_cast<int>(totalTimeSinceLoad.count() / 1000.0);
-    if (enableLog && (seconds / 30) != secSinceLastModuleCheck) //every 30 seconds
-    {
-        static std::set<std::uintptr_t> callChecks;
-
-        secSinceLastModuleCheck = seconds / 30;
-        for (const auto& it : getHookedCalls())
-        {
-            if (it.name == NULL || it.name[0] == 0)
-                continue;
-
-            const std::uintptr_t functionAddress = !it.isVTableAddress ? injector::GetBranchDestination(it.address).as_int() : *reinterpret_cast<const std::uintptr_t*>(it.address);
-
-            const std::uintptr_t expectedFunctionAddress = reinterpret_cast<std::uintptr_t>(it.changedFunction);
-
-            if (functionAddress != expectedFunctionAddress && callChecks.insert(it.address).second)
-            {
-                const auto moduleInfo = LoadedModules::GetModuleAtAddress(functionAddress);
-
-                const std::string moduleName = getFilenameFromPath(moduleInfo.first);
-
-                if (functionAddress > 0 && !moduleName.empty())
-                    Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.name, it.address, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
-                else
-                    Log::Write("Modified call detected: %s 0x%08X %s\n", it.name, it.address, bytesToString(it.address, 5).c_str());
-            }
-
-            const auto& gtaSaModule = LoadedModules::GetExeModule();
-            const std::uintptr_t gtaSaBase = reinterpret_cast<std::uintptr_t>(gtaSaModule.second.lpBaseOfDll);
-            const std::uintptr_t gtaSaEnd = gtaSaBase + gtaSaModule.second.SizeOfImage;
-
-            const std::uintptr_t originalFunction = reinterpret_cast<std::uintptr_t>(it.originalFunction);
-
-            if (gtaSaBase && originalFunction >= gtaSaBase && originalFunction < gtaSaEnd)
-            {
-                const std::uintptr_t functionStartDestination = injector::GetBranchDestination(originalFunction).as_int();
-
-                if (functionStartDestination && (functionStartDestination < gtaSaBase || functionStartDestination >= gtaSaEnd))
-                {
-                    const auto functionStartModule = LoadedModules::GetModuleAtAddress(functionStartDestination);
-
-                    const std::string functionStartModuleName = getFilenameFromPath(functionStartModule.first);
-
-                    if (!strcasecmp(functionStartModuleName, MOD_NAME))
-                        Log::LogModifiedAddress(originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.name, originalFunction, functionStartDestination, functionStartModuleName.c_str());
-                }
-            }
-        }
-
-        for (const auto& it : getASMHooks())
-        {
-            const auto currentDestination = injector::GetBranchDestination(it.address).as_int();
-
-            std::pair<std::string, MODULEINFO> moduleInfo = LoadedModules::GetModuleAtAddress(currentDestination);
-            std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
-
-            if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.address).second)
-            {
-                if (currentDestination > 0 && !moduleName.empty())
-                    Log::Write("Modified ASM hook detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.name, it.address, currentDestination, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
-                else
-                    Log::Write("Modified ASM hook detected: %s 0x%08X %s\n", it.name, it.address, bytesToString(it.address, 5).c_str());
-            }
-        }
-    }
 
     CVector pPos = FindPlayerCoors(-1);
     CZone* zInfo = NULL;
@@ -1007,6 +919,116 @@ __declspec(noinline) void __cdecl InitialiseGameHooked()
         Log::Write("Found %u added IDs in cargrp.\n", addedIDsInGroups.size());
     }
     Log::Write("-- InitialiseGame End (%s) --\n", getDatetime(false, true, true).c_str());
+
+    if (enableLog)
+    {
+        timers.push_back(Timer::Add(std::chrono::seconds(30), [&]()
+        {
+            static std::set<std::uintptr_t> callChecks;
+
+            for (const auto& it : getHookedCalls())
+            {
+                if (it.name == NULL || it.name[0] == 0)
+                    continue;
+
+                const std::uintptr_t functionAddress = !it.isVTableAddress ? injector::GetBranchDestination(it.address).as_int() : *reinterpret_cast<const std::uintptr_t*>(it.address);
+
+                const std::uintptr_t expectedFunctionAddress = reinterpret_cast<std::uintptr_t>(it.changedFunction);
+
+                if (functionAddress != expectedFunctionAddress && callChecks.insert(it.address).second)
+                {
+                    const auto moduleInfo = LoadedModules::GetModuleAtAddress(functionAddress);
+
+                    const std::string moduleName = getFilenameFromPath(moduleInfo.first);
+
+                    if (functionAddress > 0 && !moduleName.empty())
+                        Log::Write("Modified call detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.name, it.address, functionAddress, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
+                    else
+                        Log::Write("Modified call detected: %s 0x%08X %s\n", it.name, it.address, bytesToString(it.address, 5).c_str());
+                }
+
+                const auto& gtaSaModule = LoadedModules::GetExeModule();
+                const std::uintptr_t gtaSaBase = reinterpret_cast<std::uintptr_t>(gtaSaModule.second.lpBaseOfDll);
+                const std::uintptr_t gtaSaEnd = gtaSaBase + gtaSaModule.second.SizeOfImage;
+
+                const std::uintptr_t originalFunction = reinterpret_cast<std::uintptr_t>(it.originalFunction);
+
+                if (gtaSaBase && originalFunction >= gtaSaBase && originalFunction < gtaSaEnd)
+                {
+                    const std::uintptr_t functionStartDestination = injector::GetBranchDestination(originalFunction).as_int();
+
+                    if (functionStartDestination && (functionStartDestination < gtaSaBase || functionStartDestination >= gtaSaEnd))
+                    {
+                        const auto functionStartModule = LoadedModules::GetModuleAtAddress(functionStartDestination);
+
+                        const std::string functionStartModuleName = getFilenameFromPath(functionStartModule.first);
+
+                        if (!strcasecmp(functionStartModuleName, MOD_NAME))
+                            Log::LogModifiedAddress(originalFunction, "Modified function start detected: %s 0x%08X 0x%08X %s\n", it.name, originalFunction, functionStartDestination, functionStartModuleName.c_str());
+                    }
+                }
+            }
+
+            for (const auto& it : getASMHooks())
+            {
+                const auto currentDestination = injector::GetBranchDestination(it.address).as_int();
+
+                std::pair<std::string, MODULEINFO> moduleInfo = LoadedModules::GetModuleAtAddress(currentDestination);
+                std::string moduleName = moduleInfo.first.substr(moduleInfo.first.find_last_of("/\\") + 1);
+
+                if (!strcasecmp(moduleName, MOD_NAME) && callChecks.insert(it.address).second)
+                {
+                    if (currentDestination > 0 && !moduleName.empty())
+                        Log::Write("Modified ASM hook detected: %s 0x%08X 0x%08X %s 0x%08X\n", it.name, it.address, currentDestination, moduleName.c_str(), moduleInfo.second.lpBaseOfDll);
+                    else
+                        Log::Write("Modified ASM hook detected: %s 0x%08X %s\n", it.name, it.address, bytesToString(it.address, 5).c_str());
+                }
+            }
+        }));
+    }
+
+    if (lowMemoryProtection > 0)
+    {
+        timers.push_back(Timer::Add(std::chrono::seconds(2), [&]()
+        {
+            int totalMemory = getMemoryUsage() / 1024 / 1024;
+
+            if (totalMemory > lowMemoryProtection && (enablePeds || enablePedWeapons || enableVehicles))
+            {
+                CMessages::AddMessageJumpQ("~y~Model Variations~s~: Mod disabled due to low memory. Reload manually.", 4000, 0, false);
+                reinterpret_cast<void (*)()>(0x40CF80)(); //CStreaming::RemoveAllUnusedModels
+                clearEverything();
+                enablePeds = false;
+                enablePedWeapons = false;
+                enableVehicles = false;
+            }
+        }));
+    }
+
+    if (trackReferenceCounts > 0)
+    {
+        timers.push_back(Timer::Add(std::chrono::seconds(2), [&]()
+        {
+            if (CModelInfo::GetModelInfo(0))
+                for (int i = 7; i < std::max<int>(flaMaxID, 20000); i++)
+                {
+                    auto mInfo = CModelInfo::GetModelInfo(i);
+                    if (mInfo && mInfo->m_nRefCount > trackReferenceCounts && !referenceCountModels.contains(static_cast<unsigned short>(i)))
+                    {
+                        auto modelType = (mInfo->GetModelType() == MODEL_INFO_VEHICLE) ? "(Vehicle) " : ((mInfo->GetModelType() == MODEL_INFO_PED) ? "(Ped) " : "");
+
+                        std::string warning_string = msprintf("WARNING: model %d %shas a reference count of %d\n", i, modelType, mInfo->m_nRefCount);
+                        Log::Write("%s", warning_string.c_str());
+#ifdef _DEBUG
+                        MessageBox(NULL, warning_string.c_str(), "Model Variations", MB_ICONWARNING);
+#endif
+                        referenceCountModels.insert(static_cast<unsigned short>(i));
+                    }
+                }
+        }));
+    }
+
+    restartTimers = true;
 
     if (!FrontEndMenuManager->m_bWantToRestart)
         refreshOnGameRestart();
