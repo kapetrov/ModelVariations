@@ -411,7 +411,10 @@ void refreshOnGameRestart()
         initialize();
 
     if (!modInitialized)
+    {
         MessageBox(NULL, "Could not initialize mod.", "Model Variations", MB_ICONWARNING);
+        return;
+    }
         
 
     Log::Write("-- Restarting (%s) --\n", getDatetime(false, true, true).c_str());
@@ -711,8 +714,7 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
 
     originalCall.call();
 
-    static bool jumpsLogged = false;
-    if (!jumpsLogged && logJumps && Log::Write("\nLogging JMP hooks...\n"))
+    if (logJumps && Log::Write("\nLogging JMP hooks...\n"))
     {
         std::unordered_map<std::string, std::vector<jumpInfo>> jumpsMap;
 
@@ -755,7 +757,7 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
         }
         Log::Write("\n");
 
-        jumpsLogged = true;
+        logJumps = false;
     }
 
     if (trackReferenceCounts > 0 && CModelInfo::GetModelInfo(0))
@@ -1156,21 +1158,27 @@ char __cdecl InitialiseRenderWareHooked()
     hookSharedCall<0x53E293, CPopCycle__DisplayHooked>("CPopCycle::Display"); //Render2dStuff
 
     //CFileLoader::LoadObjectTypes
-    hookSharedCall<0x5B85DD, FileLoaderLoadObject>("CFileLoader::LoadObject");
-    hookSharedCall<0x5B862C, FileLoaderLoadObject>("CFileLoader::LoadTimeObject");
-    hookSharedCall<0x5B8634, FileLoaderLoadObject>("CFileLoader::LoadWeaponObject");
-    hookSharedCall<0x5B863C, FileLoaderLoadObject>("CFileLoader::LoadClumpObject");
-    hookSharedCall<0x5B8644, FileLoaderLoadObject>("CFileLoader::LoadAnimatedClumpObject");
-    hookSharedCall<0x5B864C, FileLoaderLoadObject>("CFileLoader::LoadVehicleObject");
-    hookSharedCall<0x5B8654, FileLoaderLoadObject>("CFileLoader::LoadPedObject");
+    if (enableLog || debugKey > 0)
+    {
+        hookSharedCall<0x5B85DD, FileLoaderLoadObject>("CFileLoader::LoadObject");
+        hookSharedCall<0x5B862C, FileLoaderLoadObject>("CFileLoader::LoadTimeObject");
+        hookSharedCall<0x5B8634, FileLoaderLoadObject>("CFileLoader::LoadWeaponObject");
+        hookSharedCall<0x5B863C, FileLoaderLoadObject>("CFileLoader::LoadClumpObject");
+        hookSharedCall<0x5B8644, FileLoaderLoadObject>("CFileLoader::LoadAnimatedClumpObject");
+        hookSharedCall<0x5B864C, FileLoaderLoadObject>("CFileLoader::LoadVehicleObject");
+        hookSharedCall<0x5B8654, FileLoaderLoadObject>("CFileLoader::LoadPedObject");
+    }
 
-    hookSharedCall<0x40F716, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
-    hookSharedCall<0x40F9F1, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
-    //hookSharedCall<0x4185AF, &RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
-    if (isGameHOODLUM())
-        hookSharedCall<0x156FB57, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
-    else
-        hookSharedCall<0x40F0E7, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+    if (enableNullGuards)
+    {
+        hookSharedCall<0x40F716, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::~CColModel
+        hookSharedCall<0x40F9F1, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CColModel::RemoveCollisionVolumes
+        //hookSharedCall<0x4185AF, &RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollision::RemoveTrianglePlanes
+        if (isGameHOODLUM())
+            hookSharedCall<0x156FB57, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+        else
+            hookSharedCall<0x40F0E7, RemoveTrianglePlanesHooked>("CCollision::RemoveTrianglePlanes"); //CCollisionData::RemoveCollisionVolumes
+    }
 
     hookSharedCall<0x53E981, CGame__ProcessHooked>("CGame::Process"); //Idle
     hookSharedCall<0x748E6B, CGame__ShutdownHooked>("CGame::Shutdown"); //WinMain
