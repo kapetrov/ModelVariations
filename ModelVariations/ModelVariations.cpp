@@ -16,6 +16,7 @@
 #include <CCollisionData.h>
 #include <CEntryExit.h>
 #include <CFont.h>
+#include <CGame.h>
 #include <CLoadedCarGroup.h>
 #include <CMessages.h>
 #include <CModelInfo.h>
@@ -584,6 +585,7 @@ __declspec(noinline) void CPopCycle__DisplayHooked()
         if (CTheScripts__IsPlayerOnAMission())
             PrintDebugLine("Mission: %s", lastMissionLoaded);
 
+        PrintDebugLine("currArea: %d", CGame::currArea);
         PrintDebugLine("Current zone: %s", currentZone);
         if (player && player->m_pEnex)
             PrintDebugLine("Current interior: %.8s", player->m_pEnex);
