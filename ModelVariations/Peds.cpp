@@ -10,7 +10,9 @@
 
 #include <plugin.h>
 #include <ePedType.h>
+#include <CEntryExit.h>
 #include <CFont.h>
+#include <CGame.h>
 #include <CModelInfo.h>
 #include <CPed.h>
 #include <CPopCycle.h>
@@ -480,7 +482,7 @@ void PedVariations::UpdateVariations()
             properties->currentVariations.clear();
 
     auto player = FindPlayerPed();
-    auto interiorVariations = (player->m_pEnex) ? variations.find(*reinterpret_cast<const uint64_t*>(player->m_pEnex)) : variations.end();
+    auto interiorVariations = (CGame::currArea) ? variations.find(player->m_pEnex ? (*reinterpret_cast<const uint64_t*>(player->m_pEnex)) : (*reinterpret_cast<const uint64_t*>(CEntryExit::ms_spawnPoint))) : variations.end();
 
     for (auto modelId : pedVars.populatedModels)
     {

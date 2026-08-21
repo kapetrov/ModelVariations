@@ -9,7 +9,6 @@
 extern std::unordered_map<unsigned short, std::string> modelNames;
 extern std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 extern int maxPedID;
-extern char currentZone[9];
 extern char currentMission[9];
 
 enum class debugDrawPedStats : uint32_t

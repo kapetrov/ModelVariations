@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-extern char currentZone[9];
+extern CZone* currentZone;
 extern std::chrono::milliseconds gameplayTimeSinceLoad;
 extern char currentMission[9];
 

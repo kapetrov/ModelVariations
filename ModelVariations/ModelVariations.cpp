@@ -71,7 +71,7 @@ std::chrono::milliseconds gameplayTimeSinceLoad(0);
 
 int drawDebugText = 0;
 
-char currentZone[9] = {};
+CZone* currentZone = NULL;
 unsigned int currentWanted = 0;
 
 bool transitioning = false;
@@ -181,7 +181,7 @@ void logVariationsChange(const char* msg)
     Log::Write("Updating variations. pPos = {%f, %f, %f}\n", pPos.x, pPos.y, pPos.z);
     Log::Write("currentMission = %s lastMissionLoaded = %s\n", currentMission, lastMissionLoaded);
     Log::Write("currentWanted = %u wanted->m_nWantedLevel = %u\n", currentWanted, wanted->m_nWantedLevel);
-    Log::Write("currentZone = %.8s zInfo->m_szLabel = %.8s\n", currentZone, zInfo->m_szLabel);
+    Log::Write("currentZone = %.8s zInfo->m_szLabel = %.8s\n", currentZone ? currentZone->m_szLabel : NULL, zInfo->m_szLabel);
 
     if (player && player->m_pEnex)
         Log::Write("player->m_pEnex = %.8s\n", player->m_pEnex);
@@ -259,7 +259,10 @@ void updateVariations()
 {
     //zInfo->m_szTextKey = BLUEB | zInfo->m_szLabel = BLUEB1
 
-    currentZoneVariations = variations.find(*reinterpret_cast<uint64_t*>(currentZone));
+    if (currentZone == NULL)
+        return;
+
+    currentZoneVariations = variations.find(*reinterpret_cast<uint64_t*>(currentZone->m_szLabel));
 
     auto player = FindPlayerPed();
             
@@ -427,7 +430,7 @@ void refreshOnGameRestart()
     PedVariations::ProcessDrugDealers(true);
     LoadedModules::Refresh();
 
-    *reinterpret_cast<uint64_t*>(currentZone) = 0;
+    currentZone = NULL;
 
     loadIniData();
 
@@ -476,18 +479,6 @@ __declspec(noinline) bool __cdecl AddToLoadedVehiclesListHooked(int model)
     return 1;
 }
 
-__declspec(noinline) char __fastcall InteriorManager_c__UpdateHooked(void* _this)
-{
-    const auto originalCall = captureCurrentOriginalCall();
-
-    if (transitioning == false)
-    {
-        logVariationsChange("Interior changed");
-        updateVariations();
-    }
-    return originalCall.callMethodAndReturn<char>(_this);
-}
-
 __declspec(noinline) void __cdecl RetryLoadFileHooked(int streamNum)
 {
     const auto originalCall = captureCurrentOriginalCall();
@@ -500,34 +491,6 @@ __declspec(noinline) void __cdecl RetryLoadFileHooked(int streamNum)
     }
 
     originalCall.call(streamNum);
-}
-
-__declspec(noinline) char __fastcall TransitionFinishedHooked(CEntryExit* _this, void*, CPed* ped)
-{
-    const auto originalCall = captureCurrentOriginalCall();
-    auto retVal = originalCall.callMethodAndReturn<char>(_this, ped);
-
-    if (FindPlayerPed()->m_nAreaCode == 0 || CEntryExitManager__ms_exitEnterState != 1)
-        return retVal;
-
-    if (_this && _this->m_pLink && !transitioning)
-    {
-        transitioning = true;
-        CVector exitPos = _this->m_pLink->m_vecExitPos;
-
-        CZone* zInfo = NULL;
-        CTheZones::GetZoneInfo(&exitPos, &zInfo);
-
-        if (zInfo)
-        {
-            logVariationsChange("Exiting interior");
-
-            *reinterpret_cast<uint64_t*>(currentZone) = *reinterpret_cast<uint64_t*>(zInfo->m_szLabel);
-            updateVariations();
-        }
-    }
-
-    return retVal;
 }
 
 __declspec(noinline) void CPopCycle__DisplayHooked()
@@ -585,8 +548,9 @@ __declspec(noinline) void CPopCycle__DisplayHooked()
         if (CTheScripts__IsPlayerOnAMission())
             PrintDebugLine("Mission: %s", lastMissionLoaded);
 
-        PrintDebugLine("currArea: %d", CGame::currArea);
-        PrintDebugLine("Current zone: %s", currentZone);
+        if (CGame::currArea)
+            PrintDebugLine("currArea: %d", CGame::currArea);
+        PrintDebugLine("Current zone: %s", currentZone ? currentZone->m_szLabel : NULL);
         if (player && player->m_pEnex)
             PrintDebugLine("Current interior: %.8s", player->m_pEnex);
         if (CWeather::Rain > 0.001)
@@ -600,6 +564,37 @@ __declspec(noinline) void CPopCycle__DisplayHooked()
     }
 
     originalCall.call();
+}
+
+__declspec(noinline) CZone* __cdecl FindSmallestZoneForPositionHooked(void* point, char checkType)
+{
+    const auto originalCall = captureCurrentOriginalCall();
+    auto retVal = originalCall.callAndReturn<CZone*>(point, checkType);
+
+    auto player = FindPlayerPed();
+    static CZone *zoneStart = reinterpret_cast<CZone*>(CTheZones__NavigationZoneArray);
+
+    auto index = (reinterpret_cast<char*>(retVal) - reinterpret_cast<char*>(zoneStart))/0x20;
+
+    if (currentZone != retVal)
+    {
+        logVariationsChange("Zone changed");
+
+        currentZone = retVal;
+        updateVariations();
+    }
+
+    static auto currentSpawnPoint = CEntryExit::ms_spawnPoint;
+
+    if (currentSpawnPoint != CEntryExit::ms_spawnPoint && (player->m_pEnex ? CGame::currArea == 0 : CGame::currArea != 0))
+    {
+        logVariationsChange("Interior changed");
+
+        currentSpawnPoint = CEntryExit::ms_spawnPoint;
+        updateVariations();
+    }
+
+    return retVal;
 }
 
 //Model names
@@ -784,7 +779,7 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
             CMessages::AddMessageJumpQ("~y~Model Variations~s~: Reloading settings...", 10000, 0, false);
             loadIniData();
 
-            *reinterpret_cast<uint64_t*>(currentZone) = 0;
+            currentZone = NULL;
             CMessages::AddMessageJumpQ("~y~Model Variations~s~: Settings reloaded.", 2000, 0, false);
         }
     }
@@ -801,10 +796,6 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
     else
         keyDown = false;
 
-
-    CVector pPos = FindPlayerCoors(-1);
-    CZone* zInfo = NULL;
-    CTheZones::GetZoneInfo(&pPos, &zInfo);
     const CWanted* wanted = FindPlayerWanted(-1);
 
     if (!CTheScripts__IsPlayerOnAMission())
@@ -816,22 +807,12 @@ __declspec(noinline) void __cdecl CGame__ProcessHooked()
                 strncpy(lastMissionLoaded, script->m_szName, 8);
     }
 
-    if (!CEntryExitManager__mp_Active)
-        transitioning = false;
 
     if (wanted && wanted->m_nWantedLevel != currentWanted)
     {
         logVariationsChange("Wanted level changed");
 
         currentWanted = wanted->m_nWantedLevel;
-        updateVariations();
-    }
-
-    if (zInfo && *reinterpret_cast<uint64_t*>(zInfo->m_szLabel) != *reinterpret_cast<uint64_t*>(currentZone) && strncmp(zInfo->m_szLabel, "SAN_AND", 7) != 0)
-    {
-        logVariationsChange("Zone changed");
-
-        *reinterpret_cast<uint64_t*>(currentZone) = *reinterpret_cast<uint64_t*>(zInfo->m_szLabel);
         updateVariations();
     }
 
@@ -1176,10 +1157,9 @@ char __cdecl InitialiseRenderWareHooked()
     else
         Log::Write("Streaming fix disabled.\n");
 
-    hookSharedCall<0x440840, InteriorManager_c__UpdateHooked>("InteriorManager_c::Update"); //CEntryExit::TransitionFinished
     hookSharedCall<0x40E37B, RetryLoadFileHooked>("CStreaming::RetryLoadFile"); //CStreaming::ProcessLoadingChannel
-    hookSharedCall<0x440F89, TransitionFinishedHooked>("CEntryExit::TransitionFinished"); //CEntryExitManager::Update
     hookSharedCall<0x53E293, CPopCycle__DisplayHooked>("CPopCycle::Display"); //Render2dStuff
+    hookSharedCall<0x571FA6, FindSmallestZoneForPositionHooked>("CTheZones::FindSmallestZoneForPosition"); //CPlaceName::Process
 
     //CFileLoader::LoadObjectTypes
     if (enableLog || debugKey > 0)

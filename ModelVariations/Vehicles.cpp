@@ -537,9 +537,10 @@ void processOccupantGroups(const CVehicle* veh)
     {
         std::vector<unsigned short> zoneGroups;
 
-        if (auto it = vehVars.occupantGroups.find(*reinterpret_cast<uint64_t*>(currentZone)); it != vehVars.occupantGroups.end())
-            if (auto it2 = it->second.find(veh->m_nModelIndex); it2 != it->second.end())
-                zoneGroups = it2->second;
+        if (currentZone)
+            if (auto it = vehVars.occupantGroups.find(*reinterpret_cast<uint64_t*>(currentZone->m_szLabel)); it != vehVars.occupantGroups.end())
+                if (auto it2 = it->second.find(veh->m_nModelIndex); it2 != it->second.end())
+                    zoneGroups = it2->second;
 
         if (!zoneGroups.empty())
         {
@@ -1161,9 +1162,10 @@ void VehicleVariations::Process()
             if (IsVehiclePointerValid(veh) && veh->m_pDriver && veh->m_pDriver != FindPlayerPed() && spawnTrailer && !isAnotherVehicleBehind(veh, {}))
             {
                 std::vector<unsigned short> zoneTrailers;
-                if (auto it = vehVars.trailerZones.find(*reinterpret_cast<uint64_t*>(currentZone)); it != vehVars.trailerZones.end())
-                    if (auto it2 = it->second.find(veh->m_nModelIndex); it2 != it->second.end())
-                        zoneTrailers = it2->second;
+                if (currentZone)
+                    if (auto it = vehVars.trailerZones.find(*reinterpret_cast<uint64_t*>(currentZone->m_szLabel)); it != vehVars.trailerZones.end())
+                        if (auto it2 = it->second.find(veh->m_nModelIndex); it2 != it->second.end())
+                            zoneTrailers = it2->second;
 
                 if (properties)
                     for (auto i : properties->activeTimeGroups)
@@ -1250,7 +1252,7 @@ void VehicleVariations::UpdateVariations()
         if (auto* properties = findVehProperties(modelId))
             properties->currentVariations.clear();
 
-    auto currentZoneTuning = vehVars.tuning.find(*reinterpret_cast<uint64_t*>(currentZone));
+    auto currentZoneTuning = currentZone ? vehVars.tuning.find(*reinterpret_cast<uint64_t*>(currentZone->m_szLabel)) : vehVars.tuning.end();
 
     if (currentZoneTuning != vehVars.tuning.end())
         vehVars.currentTuning = &(currentZoneTuning->second);

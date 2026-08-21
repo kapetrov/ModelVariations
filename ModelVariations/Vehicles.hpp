@@ -9,7 +9,7 @@
 extern std::unordered_map<unsigned short, std::string> modelNames;
 extern std::unordered_map<std::string, std::vector<CZone*>> presetAllZones;
 extern bool forceEnableGlobal;
-extern char currentZone[9];
+extern CZone* currentZone;
 extern bool enableNullGuards;
 extern char currentMission[9];
 

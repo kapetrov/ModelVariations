@@ -237,8 +237,8 @@ void PedWeaponVariations::Process()
         char zoneString[9] = {};
         if (player && player->m_pEnex)
             copyString(zoneString, reinterpret_cast<char*>(player->m_pEnex), 8);
-        else
-            *reinterpret_cast<uint64_t*>(zoneString) = *reinterpret_cast<uint64_t*>(currentZone);
+        else if (currentZone)
+            *reinterpret_cast<uint64_t*>(zoneString) = *reinterpret_cast<uint64_t*>(currentZone->m_szLabel);
 
         const std::string missionString = (isOnMission) ? ("MISSION_" + std::string(currentMission) + "|") : "";
         const std::string wantedString = (wantedLevel > 0) ? ("WANTED" + std::to_string(wantedLevel) + "|") : "";
