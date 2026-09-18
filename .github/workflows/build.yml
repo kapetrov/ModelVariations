@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       sdk_ref:
-        description: "plugin-sdk commit/branch/tag"
+        description: "plugin-sdk full commit SHA, branch or tag"
         required: false
-        default: "15f15b6"
+        default: "15f15b60bbf74c106e1b496ff92c98764abf4605"
   push:
   pull_request:
 
 env:
   # plugin-sdk often ships breaking changes, so the commit is pinned
-  PLUGIN_SDK_REF: ${{ github.event.inputs.sdk_ref || '15f15b6' }}
+  PLUGIN_SDK_REF: ${{ github.event.inputs.sdk_ref || '15f15b60bbf74c106e1b496ff92c98764abf4605' }}
 
 jobs:
   build:
