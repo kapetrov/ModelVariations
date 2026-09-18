@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdk_ref:
+        description: "plugin-sdk commit/branch/tag"
+        required: false
+        default: "15f15b6"
+  push:
+  pull_request:
+
+env:
+  # plugin-sdk often ships breaking changes, so the commit is pinned
+  PLUGIN_SDK_REF: ${{ github.event.inputs.sdk_ref || '15f15b6' }}
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { mod: "GTASA Release", sdk: "Release" }
+          - { mod: "GTASA zDebug", sdk: "zDebug" }
+
+    steps:
+      - name: Checkout mod
+        uses: actions/checkout@v4
+
+      - name: Checkout plugin-sdk
+        uses: actions/checkout@v4
+        with:
+          repository: DK22Pac/plugin-sdk
+          ref: ${{ env.PLUGIN_SDK_REF }}
+          path: plugin-sdk
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup msbuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Generate plugin-sdk solution (vs2022, toolset v143)
+        shell: cmd
+        run: |
+          set PLUGIN_SDK_DIR=%GITHUB_WORKSPACE%\plugin-sdk
+          "%PLUGIN_SDK_DIR%\tools\premake\premake5.exe" vs2022 --file="%PLUGIN_SDK_DIR%\tools\premake\premake5.lua"
+
+      - name: Build plugin-sdk (plugin_sa)
+        shell: cmd
+        run: |
+          set PLUGIN_SDK_DIR=%GITHUB_WORKSPACE%\plugin-sdk
+          msbuild "%PLUGIN_SDK_DIR%\plugin.sln" /t:plugin_sa /p:Configuration=${{ matrix.config.sdk }} /p:Platform="Mixed Platforms" /m /v:minimal
+
+      - name: Build ModelVariations
+        shell: cmd
+        run: |
+          set PLUGIN_SDK_DIR=%GITHUB_WORKSPACE%\plugin-sdk
+          set GTA_SA_DIR=%GITHUB_WORKSPACE%\out
+          msbuild ModelVariations.sln /p:Configuration="${{ matrix.config.mod }}" /p:Platform=x86 /m /v:minimal
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ModelVariations-${{ matrix.config.sdk }}
+          path: |
+            out/*.asi
+            out/*.pdb
+          if-no-files-found: error
