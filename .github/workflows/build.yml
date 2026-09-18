@@ -6,13 +6,13 @@ on:
       sdk_ref:
         description: "plugin-sdk full commit SHA, branch or tag"
         required: false
-        default: "15f15b60bbf74c106e1b496ff92c98764abf4605"
+        default: "8b9748a0de0e5abacd3a4655ca14fbf7ba7b2988"
   push:
   pull_request:
 
 env:
-  # plugin-sdk often ships breaking changes, so the commit is pinned
-  PLUGIN_SDK_REF: ${{ github.event.inputs.sdk_ref || '15f15b60bbf74c106e1b496ff92c98764abf4605' }}
+  # pinned before the 2026-04-12 GetMatrix() refactor, the mod still expects CMatrixLink*
+  PLUGIN_SDK_REF: ${{ github.event.inputs.sdk_ref || '8b9748a0de0e5abacd3a4655ca14fbf7ba7b2988' }}
 
 jobs:
   build:
